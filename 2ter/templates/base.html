@@ -1,10 +1,95 @@
 <!DOCTYPE html>
-<html>
-<head lang="en">
-    <meta charset="UTF-8">
-    <title></title>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+    <!--Import materialize.css-->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.96.0/css/materialize.min.css">
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.96.0/js/materialize.min.js"></script>
+
+
 </head>
+<style>
+    #rcorners6 {
+        border-radius: 10px 10px;
+        padding: 20px;
+        background: white;
+    }
+</style>
+<style>
+    html {
+        background-color: #ffb74d
+    }
+</style>
+
 <body>
+
+<div class="section no-pad-bot" id="index-banner">
+    <div class="container">
+        <br><br>
+
+
+        <h1 class="header center white-text">2^tr</h1>
+        <h6 class="header center white-text" style="font-style: italic">(pronounced : tutor)</h6>
+
+        <div class="row center">
+            <h5 class="header col s12 light">A new revolution in educator search. Coming soon</h5>
+        </div>
+
+        <br><br>
+
+    </div>
+</div>
+
+<div class="container">
+    <form action="/contactus" method="post">
+        <div class="section">
+
+
+            <!--   Icon Section   -->
+            <div class="row">
+                <div class="col s12 m3">
+                    <div class="icon-block">
+                        <br>
+                    </div>
+                </div>
+
+
+                <div class="col s12 m6 z-depth-5" id="rcorners6">
+                    <div class="icon-block">
+                        <div class="input-field">
+
+                            <i class="mdi-communication-email orange-text prefix"></i>
+                            <input id="email" type="email" class="validate" name="email"
+                                   placeholder="Submit your email address for latest updates">
+                        </div>
+
+                        <div class="center">
+                            <button class="btn-flat waves-effect waves-light orange darken-1 white-text" type="submit"
+                                    name="action" value="Send">Submit
+                                <i class="mdi-content-send right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col s12 m3">
+                    <div class="icon-block">
+                        <br>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </form>
+</div>
+
 
 </body>
 </html>
+
+
+
+
+
+
