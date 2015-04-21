@@ -46,7 +46,6 @@
     <form action="/contactus" method="post">
         <div class="section">
 
-
             <!--   Icon Section   -->
             <div class="row">
                 <div class="col s12 m3">
@@ -57,11 +56,36 @@
 
 
                 <div class="col s12 m6 z-depth-5" id="rcorners6">
-                    <div class="icon-block center">
-                        <i class="mdi-file-cloud-done orange-text large"></i>
-                        <h6 class="center">{{ message }}</h6>
+                    <div class="icon-block">
+                        <div class="input-field">
+                                                           <i class="mdi-action-account-box orange-text prefix"></i>
+
+                                <input id="name" type="text" class="validate" name="name" placeholder="Please enter your name">
+
+                        </div>
+
+                        <div class="input-field">
+
+                            <i class="mdi-communication-email orange-text prefix"></i>
+                            <input id="email" type="email" class="validate" name="email"
+                                   placeholder="Please enter your email address">
+                        </div>
+
+                        <div class="input-field">
+                                                        <i class="mdi-action-assignment orange-text prefix"></i>
+
+                            <textarea id="message" class="materialize-textarea" name="message" placeholder="Please enter your message"></textarea>
+                        </div>
+
+                        <div class="center">
+                            <button class="btn-flat waves-effect waves-light orange darken-1 white-text" type="submit"
+                                    name="action" value="Send">Submit
+                                <i class="mdi-content-send right"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
+
                 <div class="col s12 m3">
                     <div class="icon-block">
                         <br>
@@ -73,7 +97,7 @@
     </form>
 </div>
 
-  <!-- Floating button -->
+   <!-- Floating button -->
 <div class="fixed-action-btn" style="bottom: 60px; right: 60px;">
     <a class="btn-floating btn-large red">
         <i class="large mdi-hardware-keyboard-capslock"></i>
@@ -83,6 +107,7 @@
         <li><a class="btn-floating green darken-1 tooltipped" data-position="left" data-delay="50" data-tooltip="Who we are" href="/about"><i class="large mdi-action-perm-identity"></i></a></li>
     </ul>
 </div>
+
 
 </body>
 </html>
