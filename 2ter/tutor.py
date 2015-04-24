@@ -33,6 +33,10 @@ def contact_post():
 def about_get():
     return render_template('about.html')
 
+@applic.route('/map', methods=['GET'])
+def map_get():
+    return render_template('map.html')
+
 
 if __name__ == '__main__':
     applic.run()
