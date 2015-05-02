@@ -1,0 +1,61 @@
+{% extends "template.html" %}
+{% block script %}
+<script>
+     $(document).ready(function() {
+    $('select').material_select();
+  });
+</script>
+{% endblock %}
+
+{% block content %}
+
+    <div class="container">
+        <form action="/opening" method="post">
+            <div class="section">
+
+                <!--   Icon Section   -->
+                <div class="row">
+                    <div class="col s12 m3">
+                        <div class="icon-block">
+                            <br>
+                        </div>
+                    </div>
+
+
+                    <div class="col s12 m6 z-depth-5" id="team1">
+                        <div class="icon-block">
+                            <div class="input-field">
+                                <select name="batting">
+                                    <option value="" disabled selected>Who's Batting?</option>
+                                    <option value="1">Team 1</option>
+                                    <option value="2">Team 2</option>
+                                </select>
+                            </div>
+
+                            <div class="center">
+                                <button class="btn-flat large waves-effect waves-light white orange-text"
+                                        type="submit"
+                                        name="action" value="Send">
+                                    <i class="mdi-navigation-arrow-forward large"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col s12 m3">
+                        <div class="icon-block">
+                            <br>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </form>
+    </div>
+
+{% endblock %}
+
+
+
+
+
+

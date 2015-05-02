@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+    <!--Import materialize.css-->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.96.0/css/materialize.min.css">
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.96.0/js/materialize.min.js"></script>
+    {% block script %}
+    {% endblock %}
+
+
+</head>
+<style>
+    #team1 {
+        border-radius: 10px 10px;
+        padding: 20px;
+        background: white;
+    }
+
+    #team2 {
+        border-radius: 10px 10px;
+        padding: 20px;
+        background: white;
+    }
+</style>
+<style>
+    html {
+        background-color: #ffb74d
+    }
+</style>
+
+{% block style %}
+{% endblock %}
+
+<body>
+
+<div class="section no-pad-bot" id="index-banner">
+    <div class="container">
+        <a href="/"> <h1 class="header center white-text">Skorr</h1> </a>
+        <h6 class="header center white-text" style="font-style: italic">(pronounced : tutor)</h6>
+    </div>
+</div>
+
+{% block content %}
+
+{% endblock %}
+
+  <!-- Floating button -->
+<div class="fixed-action-btn" style="bottom: 60px; right: 60px;">
+    <a class="btn-floating btn-large red">
+        <i class="large mdi-hardware-keyboard-capslock"></i>
+    </a>
+    <ul>
+        <li><a class="btn-floating blue tooltipped" data-position="left" data-delay="50" data-tooltip="Contact us" href="/contactus"><i class="large mdi-action-question-answer"></i></a></li>
+        <li><a class="btn-floating green darken-1 tooltipped" data-position="left" data-delay="50" data-tooltip="Who we are" href="/about"><i class="large mdi-action-perm-identity"></i></a></li>
+    </ul>
+</div>
+
+
+</body>
+</html>
+
+
+
+
+
+
