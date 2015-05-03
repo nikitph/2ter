@@ -1,13 +1,17 @@
 from flask import Flask, render_template, request, url_for, redirect, session
 import time
 from tinydb import TinyDB, where
-from flask import SocketIO, emit, join_room, leave_room, \
+from flask.ext.socketio import SocketIO, emit, join_room, leave_room, \
     close_room, disconnect
 from threading import Thread
+from gevent import monkey
+monkey.patch_all()
 
 import json
 
 app = Flask(__name__)
+app.debug = True
+app.config['SECRET_KEY'] = 'secret!'
 db = TinyDB('skorr.json')
 socketio = SocketIO(app)
 thread = None
@@ -16,9 +20,6 @@ team1 = []
 team2 = []
 
 
-@app.route('/')
-def hello_world():
-    return render_template('score.html')
 
 
 @app.route('/teams')
@@ -122,4 +123,4 @@ def test_broadcast_message(message):
 
 
 if __name__ == '__main__':
-    app.run()
+    socketio.run(app)
