@@ -6,6 +6,8 @@
     <script type="text/javascript" charset="utf-8">
         $(document).ready(function () {
             $('select').material_select();
+            $('.modal-trigger').leanModal();
+
 
             namespace = '/test'; // change to an empty string to use the global namespace
 
@@ -146,8 +148,6 @@
                                 class="mdi-content-add" onclick="submitFunc(6)">6</i></button>
 
 
-
-
                     </div>
                 </div>
 
@@ -159,9 +159,9 @@
                         <select id="wide" onchange="submitFuncSel(this)">
                             <option value="" disabled selected>Wide</option>
                             <option value="1wd">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
+                            <option value="2wd">2</option>
+                            <option value="3wd">3</option>
+                            <option value="4wd">4</option>
 
                         </select>
 
@@ -173,10 +173,10 @@
 
                         <select id="noball" onchange="submitFuncSel(this)">
                             <option value="" disabled selected>No Ball</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
+                            <option value="1nb">1</option>
+                            <option value="2nb">2</option>
+                            <option value="3nb">3</option>
+                            <option value="4nb">4</option>
 
                         </select>
 
@@ -188,10 +188,10 @@
 
                         <select id="bye" onchange="submitFuncSel(this)">
                             <option value="" disabled selected>Bye</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
+                            <option value="1b">1</option>
+                            <option value="2b">2</option>
+                            <option value="3b">3</option>
+                            <option value="4b">4</option>
 
                         </select>
 
@@ -201,14 +201,46 @@
                 <div class="col s12 m1">
                     <div class="icon-block center">
 
-                        <select id="lb" onchange="submitFuncSel(this)">
+                        <select id="legbye" onchange="submitFuncSel(this)">
                             <option value="" disabled selected>Leg Bye</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
+                            <option value="1lb">1</option>
+                            <option value="2lb">2</option>
+                            <option value="3lb">3</option>
+                            <option value="4lb">4</option>
 
                         </select>
+
+                    </div>
+                </div>
+
+                <div class="col s12 m1">
+                    <div class="icon-block center">
+
+                        <a class="waves-effect waves-light btn modal-trigger" href="#modal1">Modal</a>
+
+                        <!-- Modal Structure -->
+                        <div id="modal1" class="modal">
+                            <div class="modal-content">
+                                <h4>Modal Header</h4>
+
+                                  <select id="legbye" onchange="submitFuncSel(this)">
+                            <option value="" disabled selected>Leg Bye</option>
+                            <option value="1lb">1</option>
+                            <option value="2lb">2</option>
+                            <option value="3lb">3</option>
+                            <option value="4lb">4</option>
+
+
+
+                        </select>
+                            </div>
+                            <br>
+                                       <br> <br> <br> <br> <br>
+                            <div class="modal-footer">
+                                <a href="#!"
+                                   class=" modal-action modal-close waves-effect waves-green btn-flat">Agree</a>
+                            </div>
+                        </div>
 
                     </div>
                 </div>

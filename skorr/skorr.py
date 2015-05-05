@@ -86,6 +86,10 @@ def over_post():
     id = db.insert(request.form)
     return render_template('confirm.html', message=id)
 
+@app.route('/commentary', methods=['GET'])
+def comm_get():
+    return render_template('commentary.html')
+
 
 def background_thread():
     """Example of how to send server generated events to clients."""
