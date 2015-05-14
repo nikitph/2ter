@@ -18,6 +18,9 @@ thread = None
 overs = 20
 team1 = []
 team2 = []
+striker = ''
+nonstriker = ''
+total = 0
 
 
 
@@ -72,8 +75,9 @@ def pitch_get():
 
 @app.route('/pitch', methods=['POST'])
 def pitch_post():
-    id = db.insert(request.form)
-    return render_template('confirm.html', message=id)
+    global striker, nonstriker
+    print(request.form)
+    return redirect('/over')
 
 @app.route('/over', methods=['GET'])
 def over_get():
@@ -97,9 +101,6 @@ def background_thread():
     while True:
         time.sleep(10)
         count += 1
-        socketio.emit('my response',
-                      {'data': 'Server generated event', 'count': count},
-                      namespace='/test')
 
 
 @app.route('/')
@@ -114,8 +115,14 @@ def index():
 @socketio.on('my event', namespace='/test')
 def test_message(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
+    global total
+    try:
+        total += int(message['data'])
+    except:
+        pass
+
     emit('my response',
-         {'data': message['data'], 'count': session['receive_count']}, broadcast=True)
+         {'data': message['data'], 'count': session['receive_count'], 'total': total}, broadcast=True)
 
 
 @socketio.on('my broadcast event', namespace='/test')

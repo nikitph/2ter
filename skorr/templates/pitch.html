@@ -2,17 +2,17 @@
 {% block script %}
     <script>
         $(document).ready(function () {
-            var striker = JSON.parse({{ arr|safe }});
+            var striker = {{ arr|safe }};
             for (var i = 0; i < striker.length; i++) {
-                $('#striker').append('<option value=1>' + JSON.parse(striker[i]) + '</option>');
-                $('#nonstriker').append('<option value=1>' + JSON.parse(striker[i]) + '</option>');
+                $('#striker').append('<option value=' + striker[i] + '>' + striker[i] + '</option>');
+                $('#nonstriker').append('<option value=' + striker[i] +'>' + striker[i] + '</option>');
 
             }
 
             var keeper = {{ arr2|safe }};
             for (var i = 0; i < keeper.length; i++) {
-                $('#keeper').append('<option value=1>' + JSON.parse(keeper[i]) + '</option>');
-                $('#bowler').append('<option value=1>' + JSON.parse(keeper[i]) + '</option>');
+                $('#keeper').append('<option value=1>' + keeper[i] + '</option>');
+                $('#bowler').append('<option value=1>' + keeper[i] + '</option>');
 
             }
 
@@ -28,7 +28,7 @@
 {% block content %}
 
     <div class="container">
-        <form action="/opening" method="post">
+        <form action="/pitch" method="post">
             <div class="section">
 
                 <!--   Icon Section   -->
