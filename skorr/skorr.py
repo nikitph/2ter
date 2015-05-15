@@ -77,8 +77,7 @@ def opening_post():
 
 @app.route('/pitch', methods=['GET'])
 def pitch_get():
-    global team1, team2
-    return render_template('pitch.html', arr=json.dumps(team1), arr2=json.dumps(team2))
+    return render_template('pitch.html', arr=json.dumps(session['team1']), arr2=json.dumps(session['team2']))
 
 
 @app.route('/pitch', methods=['POST'])
@@ -90,7 +89,7 @@ def pitch_post():
 
 @app.route('/over', methods=['GET'])
 def over_get():
-    return render_template('over.html', arr=json.dumps(session['team1']), arr2=json.dumps(session['team2']))
+    return render_template('over.html')
 
 
 @app.route('/over', methods=['POST'])
@@ -103,9 +102,11 @@ def over_post():
 def comm_get():
     return render_template('commentary.html')
 
+
 @app.route('/scorecard', methods=['GET'])
 def sc_get():
     return render_template('scorecard.html')
+
 
 def background_thread():
     """Example of how to send server generated events to clients."""
@@ -118,6 +119,13 @@ def background_thread():
 @app.route('/')
 def index():
     global thread
+    session['dots'] = 0
+    session['ones'] = 0
+    session['twos'] = 0
+    session['threes'] = 0
+    session['fours'] = 0
+    session['sixes'] = 0
+
     if thread is None:
         thread = Thread(target=background_thread)
         thread.start()
@@ -131,25 +139,27 @@ def test_message(message):
     try:
         run = int(message['data'])
         total += run
-        if (run == 0):
-            pass
-        elif (run == 1):
+        if run == 0:
+            session['dots'] = session.get('dots', 0) + 1
+        elif run == 1:
             session['ones'] = session.get('ones', 0) + 1
-        elif (run == 2):
+        elif run == 2:
             session['twos'] = session.get('twos', 0) + 1
-        elif (run == 3):
+        elif run == 3:
             session['threes'] = session.get('threes', 0) + 1
-        elif (run == 4):
+        elif run == 4:
             session['fours'] = session.get('fours', 0) + 1
-        elif (run == 6):
+        elif run == 6:
             session['sixes'] = session.get('sixes', 0) + 1
 
     except:
         pass
 
-        emit('my response',
-             {'data': message['data'], 'count': session['receive_count'], 'total': total, 'dots': 2, 'ones':  session['ones'],
-              'twos': session['twos'], 'threes': session['threes'], 'fours': session['fours'], 'sixes': session['sixes']}, broadcast=True)
+    emit('my response',
+         {'data': message['data'], 'count': session['receive_count'], 'total': total, 'dots': session['dots'],
+          'ones': session['ones'],
+          'twos': session['twos'], 'threes': session['threes'], 'fours': session['fours'], 'sixes': session['sixes']},
+         broadcast=True)
 
 
 @socketio.on('my broadcast event', namespace='/test')
