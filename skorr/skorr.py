@@ -37,7 +37,9 @@ def teams_post():
     size = len(allplayers)
     global team1, team2
     team1 = allplayers[:(size / 2)]
+    session['team1'] = team1
     team2 = allplayers[(size / 2):]
+    session['team2'] = team2
     id = db.insert(request.form)
     print allplayers, team1, team2
     return redirect('/match', code=302)
@@ -53,6 +55,7 @@ def match_post():
     id = db.insert(request.form)
     global overs
     overs = request.form['overs']
+    session['overs'] = overs
     return redirect('/opening')
 
 
@@ -81,8 +84,7 @@ def pitch_post():
 
 @app.route('/over', methods=['GET'])
 def over_get():
-    global team1, team2
-    return render_template('over.html', arr=json.dumps(team1), arr2=json.dumps(team2))
+    return render_template('over.html', arr=json.dumps(session['team1']), arr2=json.dumps(session['team2']))
 
 
 @app.route('/over', methods=['POST'])

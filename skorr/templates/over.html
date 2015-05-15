@@ -25,7 +25,7 @@
                 var a = ''
                 Materialize.toast(msg.count + ': ' + msg.data, 1000);
                 $('#runs').find('tr').append('<td><h4>' + msg.data + '</h4></td>')
-                $('#num').html('<a class="btn-floating btn-large red">' + msg.total + '</a>');
+                $('#num').html('<a class="btn-floating btn-large red">' + msg.total + msg.dots +'</a>');
                 $('#team3').html('Striker : ' + msg.count%2 + ' <br> non-Striker : '+msg.count%3)
 
             });
@@ -253,10 +253,6 @@
 
             </div>
         </div>
-
-    </div>
-    </div>
-    </div>
 
     <div class="fixed-action-btn" style="top: 60px; right: 60px;" id="num">
         <a class="btn-floating btn-large red">
