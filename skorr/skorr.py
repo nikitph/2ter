@@ -5,6 +5,7 @@ from flask.ext.socketio import SocketIO, emit, join_room, leave_room, \
     close_room, disconnect
 from threading import Thread
 from gevent import monkey
+
 monkey.patch_all()
 
 import json
@@ -21,8 +22,12 @@ team2 = []
 striker = ''
 nonstriker = ''
 total = 0
-
-
+dots = 0
+ones = 0
+twos = 0
+threes = 0
+fours = 0
+sixes = 0
 
 
 @app.route('/teams')
@@ -82,6 +87,7 @@ def pitch_post():
     print(request.form)
     return redirect('/over')
 
+
 @app.route('/over', methods=['GET'])
 def over_get():
     return render_template('over.html', arr=json.dumps(session['team1']), arr2=json.dumps(session['team2']))
@@ -92,10 +98,14 @@ def over_post():
     id = db.insert(request.form)
     return render_template('confirm.html', message=id)
 
+
 @app.route('/commentary', methods=['GET'])
 def comm_get():
     return render_template('commentary.html')
 
+@app.route('/scorecard', methods=['GET'])
+def sc_get():
+    return render_template('scorecard.html')
 
 def background_thread():
     """Example of how to send server generated events to clients."""
@@ -119,12 +129,27 @@ def test_message(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
     global total
     try:
-        total += int(message['data'])
+        run = int(message['data'])
+        total += run
+        if (run == 0):
+            pass
+        elif (run == 1):
+            session['ones'] = session.get('ones', 0) + 1
+        elif (run == 2):
+            session['twos'] = session.get('twos', 0) + 1
+        elif (run == 3):
+            session['threes'] = session.get('threes', 0) + 1
+        elif (run == 4):
+            session['fours'] = session.get('fours', 0) + 1
+        elif (run == 6):
+            session['sixes'] = session.get('sixes', 0) + 1
+
     except:
         pass
 
-    emit('my response',
-         {'data': message['data'], 'count': session['receive_count'], 'total': total}, broadcast=True)
+        emit('my response',
+             {'data': message['data'], 'count': session['receive_count'], 'total': total, 'dots': 2, 'ones':  session['ones'],
+              'twos': session['twos'], 'threes': session['threes'], 'fours': session['fours'], 'sixes': session['sixes']}, broadcast=True)
 
 
 @socketio.on('my broadcast event', namespace='/test')
