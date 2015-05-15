@@ -109,7 +109,6 @@ def sc_get():
 
 
 def background_thread():
-    """Example of how to send server generated events to clients."""
     count = 0
     while True:
         time.sleep(10)
