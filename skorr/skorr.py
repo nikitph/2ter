@@ -21,13 +21,6 @@ team1 = []
 team2 = []
 striker = ''
 nonstriker = ''
-total = 0
-dots = 0
-ones = 0
-twos = 0
-threes = 0
-fours = 0
-sixes = 0
 
 
 @app.route('/teams')
@@ -84,6 +77,7 @@ def pitch_get():
 def pitch_post():
     global striker, nonstriker
     print(request.form)
+    init_player_one()
     return redirect('/over')
 
 
@@ -119,12 +113,7 @@ def background_thread():
 @app.route('/')
 def index():
     global thread
-    session['dots'] = 0
-    session['ones'] = 0
-    session['twos'] = 0
-    session['threes'] = 0
-    session['fours'] = 0
-    session['sixes'] = 0
+    session['total'] = 0
 
     if thread is None:
         thread = Thread(target=background_thread)
@@ -135,10 +124,9 @@ def index():
 @socketio.on('my event', namespace='/test')
 def test_message(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
-    global total
     try:
         run = int(message['data'])
-        total += run
+        session['total'] = session.get('total', 0) + run
         if run == 0:
             session['dots'] = session.get('dots', 0) + 1
         elif run == 1:
@@ -156,7 +144,8 @@ def test_message(message):
         pass
 
     emit('my response',
-         {'data': message['data'], 'count': session['receive_count'], 'total': total, 'dots': session['dots'],
+         {'data': message['data'], 'count': session['receive_count'], 'total': session['total'],
+          'dots': session['dots'],
           'ones': session['ones'],
           'twos': session['twos'], 'threes': session['threes'], 'fours': session['fours'], 'sixes': session['sixes']},
          broadcast=True)
@@ -168,6 +157,54 @@ def test_broadcast_message(message):
     emit('my response',
          {'data': message['data'], 'count': session['receive_count']},
          broadcast=True)
+
+
+def init_player_one():
+    session['dots1'] = 0
+    session['ones1'] = 0
+    session['twos1'] = 0
+    session['threes1'] = 0
+    session['fours1'] = 0
+    session['sixes1'] = 0
+
+
+def init_player_two():
+    session['dots2'] = 0
+    session['ones2'] = 0
+    session['twos2'] = 0
+    session['threes2'] = 0
+    session['fours2'] = 0
+    session['sixes2'] = 0
+
+
+def update_player_one(run):
+    if run == 0:
+        session['dots1'] = session.get('dots1', 0) + 1
+    elif run == 1:
+        session['ones1'] = session.get('ones1', 0) + 1
+    elif run == 2:
+        session['twos1'] = session.get('twos1', 0) + 1
+    elif run == 3:
+        session['threes1'] = session.get('threes1', 0) + 1
+    elif run == 4:
+        session['fours1'] = session.get('fours1', 0) + 1
+    elif run == 6:
+        session['sixes1'] = session.get('sixes1', 0) + 1
+
+
+def update_player_two(run):
+    if run == 0:
+        session['dots2'] = session.get('dots2', 0) + 1
+    elif run == 1:
+        session['ones2'] = session.get('ones2', 0) + 1
+    elif run == 2:
+        session['twos2'] = session.get('twos2', 0) + 1
+    elif run == 3:
+        session['threes2'] = session.get('threes2', 0) + 1
+    elif run == 4:
+        session['fours2'] = session.get('fours2', 0) + 1
+    elif run == 6:
+        session['sixes2'] = session.get('sixes2', 0) + 1
 
 
 if __name__ == '__main__':
