@@ -2,7 +2,7 @@ __author__ = 'Omkareshwar'
 
 
 class Player:
-    name =''
+    name = ''
     dots = 0
     ones = 0
     twos = 0
@@ -39,7 +39,7 @@ class Player:
         return True
 
     def update_runs(self, run):
-        if self.OnStrike:
+        if True:
             if run == 0:
                 self.dots += 1
             elif run == 1:
@@ -55,3 +55,14 @@ class Player:
 
     def update_strike(self, strike):
         self.OnStrike = strike
+
+    def return_runs(self):
+        """
+
+        :rtype : dict
+        """
+        runs = {'dots': self.dots,
+                'ones': self.ones,
+                'twos': self.twos, 'threes': self.threes, 'fours': self.fours, 'sixes': self.sixes,
+                'total': self.total(), 'pname': self.name}
+        return runs

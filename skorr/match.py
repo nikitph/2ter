@@ -18,4 +18,8 @@ class Match:
         pass
 
     def get_player(self, name):
+        """
+
+        :rtype : Player
+        """
         return self.team_one.get(name)
