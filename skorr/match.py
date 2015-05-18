@@ -6,6 +6,7 @@ from player import Player
 class Match:
     team_one = {}
     team_two = {}
+    overs = 0
 
     def __init__(self, team1, team2):
         for i in team1:
