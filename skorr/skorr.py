@@ -5,6 +5,8 @@ from flask.ext.socketio import SocketIO, emit, join_room, leave_room, \
     close_room, disconnect
 from threading import Thread
 from gevent import monkey
+from match import Match
+from player import Player
 
 monkey.patch_all()
 
@@ -17,10 +19,9 @@ db = TinyDB('skorr.json')
 socketio = SocketIO(app)
 thread = None
 overs = 20
-team1 = []
-team2 = []
 striker = ''
 nonstriker = ''
+match = None
 
 
 @app.route('/teams')
@@ -33,11 +34,12 @@ def teams_post():
     members = request.form.values()
     allplayers = members[1:]
     size = len(allplayers)
-    global team1, team2
     team1 = allplayers[:(size / 2)]
+    global match
     session['team1'] = team1
     team2 = allplayers[(size / 2):]
     session['team2'] = team2
+    match = Match(team1, team2)
     id = db.insert(request.form)
     print allplayers, team1, team2
     return redirect('/match', code=302)
@@ -75,9 +77,9 @@ def pitch_get():
 
 @app.route('/pitch', methods=['POST'])
 def pitch_post():
-    global striker, nonstriker
     print(request.form)
-    init_player_one()
+    session['striker'] = request.form['striker']
+    session['nonstriker'] = request.form['nonstriker']
     return redirect('/over')
 
 
@@ -123,28 +125,20 @@ def index():
 @socketio.on('my event', namespace='/test')
 def test_message(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
+    global match
     try:
         run = int(message['data'])
         session['total'] = session.get('total', 0) + run
-        if run == 0:
-            session['dots'] = session.get('dots', 0) + 1
-        elif run == 1:
-            session['ones'] = session.get('ones', 0) + 1
-        elif run == 2:
-            session['twos'] = session.get('twos', 0) + 1
-        elif run == 3:
-            session['threes'] = session.get('threes', 0) + 1
-        elif run == 4:
-            session['fours'] = session.get('fours', 0) + 1
-        elif run == 6:
-            session['sixes'] = session.get('sixes', 0) + 1
+        striker = match.get_player(session['striker'])
+        striker.update_runs(run)
+        update_striker(run)
 
     except:
         pass
 
     emit('my response',
          {'data': message['data'], 'count': session['receive_count'], 'total': session['total'],
-          'dots': session['dots'],
+          'dots': striker.dots,
           'ones': session['ones'],
           'twos': session['twos'], 'threes': session['threes'], 'fours': session['fours'], 'sixes': session['sixes']},
          broadcast=True)
@@ -158,52 +152,23 @@ def test_broadcast_message(message):
          broadcast=True)
 
 
-def init_player_one():
-    session['dots1'] = 0
-    session['ones1'] = 0
-    session['twos1'] = 0
-    session['threes1'] = 0
-    session['fours1'] = 0
-    session['sixes1'] = 0
+def init_player_one(name):
+    player_one = Player(name)
+    return player_one
 
 
-def init_player_two():
-    session['dots2'] = 0
-    session['ones2'] = 0
-    session['twos2'] = 0
-    session['threes2'] = 0
-    session['fours2'] = 0
-    session['sixes2'] = 0
+def init_player_two(name):
+    player_two = Player(name)
+    return player_two
 
 
-def update_player_one(run):
-    if run == 0:
-        session['dots1'] = session.get('dots1', 0) + 1
-    elif run == 1:
-        session['ones1'] = session.get('ones1', 0) + 1
-    elif run == 2:
-        session['twos1'] = session.get('twos1', 0) + 1
-    elif run == 3:
-        session['threes1'] = session.get('threes1', 0) + 1
-    elif run == 4:
-        session['fours1'] = session.get('fours1', 0) + 1
-    elif run == 6:
-        session['sixes1'] = session.get('sixes1', 0) + 1
-
-
-def update_player_two(run):
-    if run == 0:
-        session['dots2'] = session.get('dots2', 0) + 1
-    elif run == 1:
-        session['ones2'] = session.get('ones2', 0) + 1
-    elif run == 2:
-        session['twos2'] = session.get('twos2', 0) + 1
-    elif run == 3:
-        session['threes2'] = session.get('threes2', 0) + 1
-    elif run == 4:
-        session['fours2'] = session.get('fours2', 0) + 1
-    elif run == 6:
-        session['sixes2'] = session.get('sixes2', 0) + 1
+def update_striker(run):
+    if run % 2 == 0:
+        pass
+    elif run % 2 == 1:
+        temp = session['striker']
+        session['striker'] = session['nonstriker']
+        session['nonstriker'] = temp
 
 
 if __name__ == '__main__':
