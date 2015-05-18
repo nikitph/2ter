@@ -19,8 +19,6 @@ db = TinyDB('skorr.json')
 socketio = SocketIO(app)
 thread = None
 overs = 20
-striker = ''
-nonstriker = ''
 match = None
 
 
@@ -31,6 +29,7 @@ def teams_get():
 
 @app.route('/teams', methods=['POST'])
 def teams_post():
+    session['mtotal'] = 0
     members = request.form.values()
     allplayers = members[1:]
     size = len(allplayers)
@@ -114,7 +113,7 @@ def background_thread():
 @app.route('/')
 def index():
     global thread
-    session['total'] = 0
+    session['mtotal'] = 0
 
     if thread is None:
         thread = Thread(target=background_thread)
@@ -125,23 +124,23 @@ def index():
 @socketio.on('my event', namespace='/test')
 def test_message(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
+    response = {}
     global match
     try:
         run = int(message['data'])
-        session['total'] = session.get('total', 0) + run
+        session['mtotal'] = session.get('mtotal', 0) + run
         striker = match.get_player(session['striker'])
         striker.update_runs(run)
         update_striker(run)
+        response = striker.return_runs()
 
-    except:
-        pass
+    except Exception as e:
+        print(str(e))
 
-    emit('my response',
-         {'data': message['data'], 'count': session['receive_count'], 'total': session['total'],
-          'dots': striker.dots,
-          'ones': session['ones'],
-          'twos': session['twos'], 'threes': session['threes'], 'fours': session['fours'], 'sixes': session['sixes']},
-         broadcast=True)
+    response['data'] = message['data']
+    response['count'] = session['receive_count']
+    response['mtotal'] = session['mtotal']
+    emit('my response', response, broadcast=True)
 
 
 @socketio.on('my broadcast event', namespace='/test')
