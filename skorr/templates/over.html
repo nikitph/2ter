@@ -37,7 +37,7 @@
             // handlers for the different forms in the page
             // these send data to the server in a variety of ways
             $('form#emit').submit(function (event) {
-                socket.emit('my event', {data: $('#emit_data').val()});
+                socket.emit('my event', {data: $('#emit_data').val(), invalid: false});
                 return false;
             });
             $('form#broadcast').submit(function (event) {
@@ -85,6 +85,18 @@
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
 
             socket.emit('my event', {data: sel.value});
+            initSelec(sel);
+            return false;
+        }
+
+        function submitFuncSelInvalidBall(sel) {
+            namespace = '/test'; // change to an empty string to use the global namespace
+
+            // the socket.io documentation recommends sending an explicit package upon connection
+            // this is specially important when using the global namespace
+            var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
+
+            socket.emit('my event', {data: sel.value, invalid: true});
             initSelec(sel);
             return false;
         }
@@ -183,7 +195,7 @@
             <div class="col s12 m1">
                 <div class="icon-block center">
 
-                    <select id="wide" onchange="submitFuncSel(this)">
+                    <select id="wide" onchange="submitFuncSelInvalidBall(this)">
                         <option value="" disabled selected>Wide</option>
                         <option value="1wd">1</option>
                         <option value="2wd">2</option>
@@ -198,12 +210,12 @@
             <div class="col s12 m1">
                 <div class="icon-block center">
 
-                    <select id="noball" onchange="submitFuncSel(this)">
+                    <select id="noball" onchange="submitFuncSelInvalidBall(this)">
                         <option value="" disabled selected>No Ball</option>
-                        <option value="1nb">1</option>
-                        <option value="2nb">2</option>
-                        <option value="3nb">3</option>
-                        <option value="4nb">4</option>
+                        <option value="1 nb">1</option>
+                        <option value="2 nb">2</option>
+                        <option value="3 nb">3</option>
+                        <option value="4 nb">4</option>
 
                     </select>
 
