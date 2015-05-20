@@ -24,10 +24,11 @@
                 Materialize.toast(msg.count + ': ' + msg.data, 1000);
                 $('#runs').find('tr').append('<td><h4>' + msg.data + '</h4></td>');
                 $('#num').html('<a class="btn-floating btn-large red">' + msg.mtotal + '</a>');
-                $('#team3').html(msg.playerone + ' : ' + msg.playeroneruns + ' <br>' + msg.playertwo +' : '+msg.playertworuns);
+                $('#team3').html(msg.playerone + ' : ' + msg.playeroneruns + ' <br>' + msg.playertwo + ' : ' + msg.playertworuns);
 
-                if(msg.endofover)
+                if (msg.endofover)
                 {
+                    Materialize.toast('End of over', 1000);
                     $('#runs').find('tr').delay(5000).html('');
                 }
 
@@ -103,159 +104,159 @@
         <div class="section">
 
             <div class="row">
-                <div class="col s12 m3" >
+                <div class="col s12 m3">
                     <div class="icon-block">
                         <br>
                     </div>
                 </div>
                 <div class="col s12 m3" id="team3">
-                        Striker : 1
-                        <br>
+                    Striker : 1
+                    <br>
                     non-Striker : 2
-                    </div>
-                </div>
-                <div class="col s12 m3">
-                    <div class="icon-block">
-                        <br>
-                    </div>
                 </div>
             </div>
-
-
-            <!--   Icon Section   -->
-            <div class="row">
-                <div class="col s12 m3" id="batsman">
-                    <div class="icon-block">
-                        <br>
-                    </div>
+            <div class="col s12 m3">
+                <div class="icon-block">
+                    <br>
                 </div>
-
-
-                <div class="col s12 m8 z-depth-5" id="team1">
-                    <div class="icon-block">
-                        <div class="input-field">
-
-                            <table id="runs">
-                                <tbody>
-                                <tr>
-
-                                </tr>
-
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-                <div class="col s12 m1">
-                    <div class="icon-block">
-                    </div>
-                </div>
-
-            </div>
-            <div class="row">
-                <div class="col s12 m12">
-                    <div class="icon-block center">
-                        <button class="btn-floating btn-large waves-effect waves-light red"><i
-                                class="mdi-content-add" onclick="submitFunc(0)">0</i></button>
-
-                        <button class="btn-floating btn-large waves-effect waves-light red"><i
-                                class="mdi-content-add" onclick="submitFunc(1)">1</i></button>
-
-                        <button class="btn-floating btn-large waves-effect waves-light red"><i
-                                class="mdi-content-add" onclick="submitFunc(2)">2</i></button>
-
-                        <button class="btn-floating btn-large waves-effect waves-light red"><i
-                                class="mdi-content-add" onclick="submitFunc(3)">3</i></button>
-
-                        <button class="btn-floating btn-large waves-effect waves-light red"><i
-                                class="mdi-content-add" onclick="submitFunc(4)">4</i></button>
-
-                        <button class="btn-floating btn-large waves-effect waves-light red"><i
-                                class="mdi-content-add" onclick="submitFunc(6)">6</i></button>
-
-
-                    </div>
-                </div>
-
-            </div>
-            <div class="row">
-                <div class="col s12 m1">
-                    <div class="icon-block center">
-
-                        <select id="wide" onchange="submitFuncSel(this)">
-                            <option value="" disabled selected>Wide</option>
-                            <option value="1wd">1</option>
-                            <option value="2wd">2</option>
-                            <option value="3wd">3</option>
-                            <option value="4wd">4</option>
-
-                        </select>
-
-                    </div>
-                </div>
-
-                <div class="col s12 m1">
-                    <div class="icon-block center">
-
-                        <select id="noball" onchange="submitFuncSel(this)">
-                            <option value="" disabled selected>No Ball</option>
-                            <option value="1nb">1</option>
-                            <option value="2nb">2</option>
-                            <option value="3nb">3</option>
-                            <option value="4nb">4</option>
-
-                        </select>
-
-                    </div>
-                </div>
-
-                <div class="col s12 m1">
-                    <div class="icon-block center">
-
-                        <select id="bye" onchange="submitFuncSel(this)">
-                            <option value="" disabled selected>Bye</option>
-                            <option value="1b">1</option>
-                            <option value="2b">2</option>
-                            <option value="3b">3</option>
-                            <option value="4b">4</option>
-
-                        </select>
-
-                    </div>
-                </div>
-
-                <div class="col s12 m1">
-                    <div class="icon-block center">
-
-                        <select id="legbye" onchange="submitFuncSel(this)">
-                            <option value="" disabled selected>Leg Bye</option>
-                            <option value="1lb">1</option>
-                            <option value="2lb">2</option>
-                            <option value="3lb">3</option>
-                            <option value="4lb">4</option>
-
-                        </select>
-
-                    </div>
-                </div>
-
-                <div class="col s12 m3">
-                    <div class="icon-block center">
-
-
-                        <select id="wicket" onchange="submitFuncSel(this)">
-                            <option value="" disabled selected>Wicket</option>
-                            <option value="W">Striker out</option>
-                            <option value="W">Non Striker out</option>
-
-                        </select>
-                    </div>
-
-
-                </div>
-
             </div>
         </div>
+
+
+        <!--   Icon Section   -->
+        <div class="row">
+            <div class="col s12 m3" id="batsman">
+                <div class="icon-block">
+                    <br>
+                </div>
+            </div>
+
+
+            <div class="col s12 m8 z-depth-5" id="team1">
+                <div class="icon-block">
+                    <div class="input-field">
+
+                        <table id="runs">
+                            <tbody>
+                            <tr>
+
+                            </tr>
+
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col s12 m1">
+                <div class="icon-block">
+                </div>
+            </div>
+
+        </div>
+        <div class="row">
+            <div class="col s12 m12">
+                <div class="icon-block center">
+                    <button class="btn-floating btn-large waves-effect waves-light red"><i
+                            class="mdi-content-add" onclick="submitFunc(0)">0</i></button>
+
+                    <button class="btn-floating btn-large waves-effect waves-light red"><i
+                            class="mdi-content-add" onclick="submitFunc(1)">1</i></button>
+
+                    <button class="btn-floating btn-large waves-effect waves-light red"><i
+                            class="mdi-content-add" onclick="submitFunc(2)">2</i></button>
+
+                    <button class="btn-floating btn-large waves-effect waves-light red"><i
+                            class="mdi-content-add" onclick="submitFunc(3)">3</i></button>
+
+                    <button class="btn-floating btn-large waves-effect waves-light red"><i
+                            class="mdi-content-add" onclick="submitFunc(4)">4</i></button>
+
+                    <button class="btn-floating btn-large waves-effect waves-light red"><i
+                            class="mdi-content-add" onclick="submitFunc(6)">6</i></button>
+
+
+                </div>
+            </div>
+
+        </div>
+        <div class="row">
+            <div class="col s12 m1">
+                <div class="icon-block center">
+
+                    <select id="wide" onchange="submitFuncSel(this)">
+                        <option value="" disabled selected>Wide</option>
+                        <option value="1wd">1</option>
+                        <option value="2wd">2</option>
+                        <option value="3wd">3</option>
+                        <option value="4wd">4</option>
+
+                    </select>
+
+                </div>
+            </div>
+
+            <div class="col s12 m1">
+                <div class="icon-block center">
+
+                    <select id="noball" onchange="submitFuncSel(this)">
+                        <option value="" disabled selected>No Ball</option>
+                        <option value="1nb">1</option>
+                        <option value="2nb">2</option>
+                        <option value="3nb">3</option>
+                        <option value="4nb">4</option>
+
+                    </select>
+
+                </div>
+            </div>
+
+            <div class="col s12 m1">
+                <div class="icon-block center">
+
+                    <select id="bye" onchange="submitFuncSel(this)">
+                        <option value="" disabled selected>Bye</option>
+                        <option value="1b">1</option>
+                        <option value="2b">2</option>
+                        <option value="3b">3</option>
+                        <option value="4b">4</option>
+
+                    </select>
+
+                </div>
+            </div>
+
+            <div class="col s12 m1">
+                <div class="icon-block center">
+
+                    <select id="legbye" onchange="submitFuncSel(this)">
+                        <option value="" disabled selected>Leg Bye</option>
+                        <option value="1lb">1</option>
+                        <option value="2lb">2</option>
+                        <option value="3lb">3</option>
+                        <option value="4lb">4</option>
+
+                    </select>
+
+                </div>
+            </div>
+
+            <div class="col s12 m3">
+                <div class="icon-block center">
+
+
+                    <select id="wicket" onchange="submitFuncSel(this)">
+                        <option value="" disabled selected>Wicket</option>
+                        <option value="W">Striker out</option>
+                        <option value="W">Non Striker out</option>
+
+                    </select>
+                </div>
+
+
+            </div>
+
+        </div>
+    </div>
 
     <div class="fixed-action-btn" style="top: 60px; right: 60px;" id="num">
         <a class="btn-floating btn-large red">
