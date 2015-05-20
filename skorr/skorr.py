@@ -135,12 +135,12 @@ def test_message(message):
     response = {}
     global match
     try:
-        run = int(message['data'])
+        run = int(message['data'].split()[0])
         session['mtotal'] = session.get('mtotal', 0) + run
         striker = match.get_player(session['striker'])
         striker.update_runs(run)
         update_striker(run)
-        if is_valid_delivery():
+        if not message['invalid']:
             session['validdeliveries'] += 1
         scorecard_dict = []
         for p in match.get_all_players(1):
@@ -175,6 +175,12 @@ def test_broadcast_message(message):
     emit('my response',
          {'data': message['data'], 'count': session['receive_count']},
          broadcast=True)
+
+@socketio.on('my wicket', namespace='/test')
+def wicket(message):
+    response = dict()
+    response['data'] = 'wicket'
+    emit('my response', response, broadcast=True)
 
 
 def init_player_one(name):
