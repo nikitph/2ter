@@ -78,7 +78,11 @@ def pitch_get():
 def pitch_post():
     print(request.form)
     session['striker'] = request.form['striker']
+    session['playerone'] = request.form['striker']
     session['nonstriker'] = request.form['nonstriker']
+    session['playertwo'] = request.form['nonstriker']
+    session['validdeliveries'] = 0
+
     return redirect('/over')
 
 
@@ -121,6 +125,10 @@ def index():
     return render_template('index.html')
 
 
+def is_valid_delivery():
+    return True
+
+
 @socketio.on('my event', namespace='/test')
 def test_message(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
@@ -132,7 +140,25 @@ def test_message(message):
         striker = match.get_player(session['striker'])
         striker.update_runs(run)
         update_striker(run)
-        response = striker.return_runs()
+        if is_valid_delivery():
+            session['validdeliveries'] += 1
+        scorecard_dict = []
+        for p in match.get_all_players(1):
+            temp = match.get_player(p)
+            scorecard_dict.append(temp.return_runs())
+
+        response['scorecard'] = scorecard_dict
+        response['playerone'] = session['playerone']
+        player_1 = match.get_player(session['playerone'])
+        response['playeroneruns'] = player_1.total()
+        response['playertwo'] = session['playertwo']
+        player_2 = match.get_player(session['playertwo'])
+        response['playertworuns'] = player_2.total()
+        response['endofover'] = False
+        if session['validdeliveries'] == 6:
+            response['endofover'] = True
+            session['validdeliveries'] = 0
+            update_striker(1)
 
     except Exception as e:
         print(str(e))

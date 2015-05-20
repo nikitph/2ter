@@ -23,3 +23,9 @@ class Match:
         :rtype : Player
         """
         return self.team_one.get(name)
+
+    def get_all_players(self, team):
+        if team == 1:
+            return self.team_one
+        elif team == 2:
+            return self.team_two

@@ -12,8 +12,6 @@
 
             namespace = '/test'; // change to an empty string to use the global namespace
 
-            // the socket.io documentation recommends sending an explicit package upon connection
-            // this is specially important when using the global namespace
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
             socket.on('connect', function () {
                 socket.emit('my event', {data: ' '});
@@ -24,9 +22,14 @@
             socket.on('my response', function (msg) {
                 var a = ''
                 Materialize.toast(msg.count + ': ' + msg.data, 1000);
-                $('#runs').find('tr').append('<td><h4>' + msg.data + '</h4></td>')
-                $('#num').html('<a class="btn-floating btn-large red">' + msg.mtotal + msg.dots +'</a>');
-                $('#team3').html('Striker : ' + msg.count%2 + ' <br> non-Striker : '+msg.count%3)
+                $('#runs').find('tr').append('<td><h4>' + msg.data + '</h4></td>');
+                $('#num').html('<a class="btn-floating btn-large red">' + msg.mtotal + '</a>');
+                $('#team3').html(msg.playerone + ' : ' + msg.playeroneruns + ' <br>' + msg.playertwo +' : '+msg.playertworuns);
+
+                if(msg.endofover)
+                {
+                    $('#runs').find('tr').delay(5000).html('');
+                }
 
             });
 

@@ -3,6 +3,8 @@
 
     <script type="text/javascript"
             src="http://cdnjs.cloudflare.com/ajax/libs/socket.io/0.9.16/socket.io.min.js"></script>
+    <script type="text/javascript"
+            src="/static/jsonTable.js"></script>
     <script type="text/javascript" charset="utf-8">
         $(document).ready(function () {
 
@@ -19,29 +21,14 @@
             // event handler for server sent data
             // the data is displayed in the "Received" section of the page
             socket.on('my response', function (msg) {
-                var a = ''
+                var a = '';
+                var sourc = msg.scorecard;
+                var options = {source: JSON.stringify(sourc)};
                 Materialize.toast(msg.count + ': ' + msg.data, 1000);
-                $('#commentary').html('<table> <thead>\
-          <tr>\
-              <th data-field="id">Name</th>\
-              <th data-field="name">0s</th>\
-              <th data-field="price">1s</th>\
-              <th data-field="name">2s</th>\
-              <th data-field="price">3s</th>\
-              <th data-field="name">4s</th>\
-              <th data-field="price">6s</th>\
-              <th data-field="price">Total</th>\
-          </tr>\
-          </tr>\
-        </thead><tbody> <tr> <td>' + msg.pname + '</td>' +
-                ' <td>' + msg.dots + '</td>' +
-                ' <td>' + msg.ones + '</td>' +
-                ' <td>' + msg.twos + '</td>' +
-                ' <td>' + msg.threes + '</td>' +
-                ' <td>' + msg.fours + '</td>' +
-                ' <td>' + msg.sixes + '</td>' +
-                ' <td>' + msg.total + '</td>' +
-                '</tr></tbody></table>');
+                var tbl = $('#commentary');
+                    var jsonHtmlTable = ConvertJsonToTable(sourc, 'jsonTable', null, 'Download');
+                tbl.html(jsonHtmlTable);
+
 
             });
         })
@@ -66,7 +53,7 @@
 
                 <div class="col s12 m6 z-depth-5" id="team1">
                     <div class="icon-block center">
-                        <div id="commentary" class="collection">
+                        <div id="commentary">
                         </div>
                     </div>
                 </div>

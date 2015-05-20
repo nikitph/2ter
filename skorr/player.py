@@ -61,8 +61,9 @@ class Player:
 
         :rtype : dict
         """
-        runs = {'dots': self.dots,
+        runs = {'pname': self.name,
+                'dots': self.dots,
                 'ones': self.ones,
                 'twos': self.twos, 'threes': self.threes, 'fours': self.fours, 'sixes': self.sixes,
-                'total': self.total(), 'pname': self.name}
+                'total': self.total()}
         return runs
