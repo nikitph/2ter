@@ -133,15 +133,39 @@ def is_valid_delivery():
 def test_message(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
     response = {}
+    isNoBall = message['noball']
+    isWideBall = message['wide']
+    isValid = not message['invalid']
+    isBye = message['bye']
+    isLegBye = message['legbye']
     global match
     try:
-        run = int(message['data'].split()[0])
+        run = int(message['data'])
         session['mtotal'] = session.get('mtotal', 0) + run
         striker = match.get_player(session['striker'])
-        striker.update_runs(run)
-        update_striker(run)
-        if not message['invalid']:
+        if isNoBall:
+            if message['nbe']:
+                update_striker(run-1)
+            else:
+                striker.update_runs(run-1)
+                update_striker(run-1)
+
+        elif isWideBall:
+            update_striker(run-1)
+
+        elif isLegBye:
+            update_striker(run)
+
+        elif isBye:
+            update_striker(run)
+
+        else:
+            striker.update_runs(run)
+            update_striker(run)
+
+        if isValid:
             session['validdeliveries'] += 1
+
         scorecard_dict = []
         for p in match.get_all_players(1):
             temp = match.get_player(p)

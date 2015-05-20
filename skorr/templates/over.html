@@ -37,7 +37,7 @@
             // handlers for the different forms in the page
             // these send data to the server in a variety of ways
             $('form#emit').submit(function (event) {
-                socket.emit('my event', {data: $('#emit_data').val(), invalid: false});
+                socket.emit('my event', {data: $('#emit_data').val(), invalid: false, noball: false, wide: false, bye: false, legbye: false});
                 return false;
             });
             $('form#broadcast').submit(function (event) {
@@ -73,30 +73,59 @@
             // this is specially important when using the global namespace
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
 
-            socket.emit('my event', {data: i});
+            socket.emit('my event', {data: i, invalid: false, noball: false, wide: false, bye: false, legbye: false});
             return false;
         }
 
-        function submitFuncSel(sel) {
+        function submitFuncSelBye(sel) {
             namespace = '/test'; // change to an empty string to use the global namespace
 
             // the socket.io documentation recommends sending an explicit package upon connection
             // this is specially important when using the global namespace
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
 
-            socket.emit('my event', {data: sel.value});
+            socket.emit('my event', {data: sel.value, invalid: false, noball: false, wide: false, bye: true, legbye: false });
             initSelec(sel);
             return false;
         }
 
-        function submitFuncSelInvalidBall(sel) {
+        function submitFuncSelLegBye(sel) {
             namespace = '/test'; // change to an empty string to use the global namespace
 
             // the socket.io documentation recommends sending an explicit package upon connection
             // this is specially important when using the global namespace
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
 
-            socket.emit('my event', {data: sel.value, invalid: true});
+            socket.emit('my event', {data: sel.value, invalid: false, noball: false, wide: false, bye: false, legbye: true });
+            initSelec(sel);
+            return false;
+        }
+
+
+        function submitFuncSelWideBall(sel) {
+            namespace = '/test'; // change to an empty string to use the global namespace
+
+            // the socket.io documentation recommends sending an explicit package upon connection
+            // this is specially important when using the global namespace
+            var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
+
+            socket.emit('my event', {data: sel.value, invalid: true, wide: true, noball:false, bye: false, legbye: false});
+            initSelec(sel);
+            return false;
+        }
+
+        function submitFuncSelNoBall(sel) {
+            namespace = '/test'; // change to an empty string to use the global namespace
+
+            // the socket.io documentation recommends sending an explicit package upon connection
+            // this is specially important when using the global namespace
+            var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
+            var selval = sel.value;
+            var run = selval.split(' ');
+            var nbe = false;
+            if(run[1] =='nbe')
+                nbe = true;
+            socket.emit('my event', {data: run[0], invalid: true, noball: true, wide : false, bye: false, legbye: false, noballextra:nbe});
             initSelec(sel);
             return false;
         }
@@ -195,13 +224,13 @@
             <div class="col s12 m1">
                 <div class="icon-block center">
 
-                    <select id="wide" onchange="submitFuncSelInvalidBall(this)">
+                    <select id="wide" onchange="submitFuncSelWideBall(this)">
                         <option value="" disabled selected>Wide</option>
-                        <option value="1wd">1</option>
-                        <option value="2wd">2</option>
-                        <option value="3wd">3</option>
-                        <option value="4wd">4</option>
-                        <option value="5wd">5</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
 
                     </select>
 
@@ -211,17 +240,18 @@
             <div class="col s12 m2">
                 <div class="icon-block center">
 
-                    <select id="noball" onchange="submitFuncSelInvalidBall(this)">
+                    <select id="noball" onchange="submitFuncSelNoBall(this)">
                         <option value="" disabled selected>No Ball</option>
-                        <option value="0nb">0</option>
-                        <option value="1nb">1+Nb</option>
-                        <option value="2nb">2+Nb</option>
-                        <option value="3nb">3+Nb</option>
-                        <option value="4nb">4+Nb</option>
-                        <option value="1nbe">1+Nb(Extra)</option>
-                        <option value="2nbe">2+Nb(Extra)</option>
-                        <option value="3nbe">3+Nb(Extra)</option>
-                        <option value="4nbe">4+Nb(Extra)</option>
+                        <option value="1 nb">Nb</option>
+                        <option value="2 nb">1+Nb</option>
+                        <option value="3 nb">2+Nb</option>
+                        <option value="4 nb">3+Nb</option>
+                        <option value="5 nb">4+Nb</option>
+                        <option value="7 nb">6+Nb</option>
+                        <option value="2 nbe">1+Nb(Extra)</option>
+                        <option value="3 nbe">2+Nb(Extra)</option>
+                        <option value="4 nbe">3+Nb(Extra)</option>
+                        <option value="5 nbe">4+Nb(Extra)</option>
 
                     </select>
 
@@ -231,12 +261,12 @@
             <div class="col s12 m1">
                 <div class="icon-block center">
 
-                    <select id="bye" onchange="submitFuncSel(this)">
+                    <select id="bye" onchange="submitFuncSelBye(this)">
                         <option value="" disabled selected>Bye</option>
-                        <option value="1b">1</option>
-                        <option value="2b">2</option>
-                        <option value="3b">3</option>
-                        <option value="4b">4</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
 
                     </select>
 
@@ -246,12 +276,12 @@
             <div class="col s12 m1">
                 <div class="icon-block center">
 
-                    <select id="legbye" onchange="submitFuncSel(this)">
+                    <select id="legbye" onchange="submitFuncSelLegBye(this)">
                         <option value="" disabled selected>Leg Bye</option>
-                        <option value="1lb">1</option>
-                        <option value="2lb">2</option>
-                        <option value="3lb">3</option>
-                        <option value="4lb">4</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
 
                     </select>
 
@@ -260,8 +290,6 @@
 
             <div class="col s12 m3">
                 <div class="icon-block center">
-
-
                     <select id="wicket" onchange="submitFuncSel(this)">
                         <option value="" disabled selected>Wicket</option>
                         <option value="W">Striker out</option>
