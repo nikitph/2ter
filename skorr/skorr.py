@@ -39,6 +39,7 @@ def teams_post():
     team2 = allplayers[(size / 2):]
     session['team2'] = team2
     match = Match(team1, team2)
+    session['wickets'] = (size / 2) - 1
     id = db.insert(request.form)
     print allplayers, team1, team2
     return redirect('/match', code=302)
@@ -55,6 +56,8 @@ def match_post():
     global overs
     overs = request.form['overs']
     session['overs'] = overs
+    session['currentovers'] = 0
+    session['currentwickets'] = 0
     return redirect('/opening')
 
 
@@ -133,11 +136,13 @@ def is_valid_delivery():
 def test_message(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
     response = {}
+    response['endofinnings'] = False
     isNoBall = message['noball']
     isWideBall = message['wide']
     isValid = not message['invalid']
     isBye = message['bye']
     isLegBye = message['legbye']
+    isWicket = message['wicket']
     global match
     try:
         run = int(message['data'])
@@ -159,6 +164,19 @@ def test_message(message):
         elif isBye:
             update_striker(run)
 
+        elif isWicket:
+            session['currentwickets'] += 1
+            if session['currentwickets'] == session['wickets']:
+                response['endofinnings'] = True
+            if not response['endofinnings']:
+                if message['stikerout']:
+                    session['striker'] = match.get_next_player(session['currentwickets'] + 2)
+                    session['playerone'] = session['striker']
+
+                else:
+                    session['nonstriker'] = match.get_next_player(session['currentwickets'] + 2)
+                    session['playertwo'] = session['nonstriker']
+
         else:
             striker.update_runs(run)
             update_striker(run)
@@ -179,10 +197,15 @@ def test_message(message):
         player_2 = match.get_player(session['playertwo'])
         response['playertworuns'] = player_2.total()
         response['endofover'] = False
+
         if session['validdeliveries'] == 6:
             response['endofover'] = True
             session['validdeliveries'] = 0
             update_striker(1)
+            session['currentovers'] += 1
+            if session['currentovers'] == session['overs']:
+                response['endofinnings'] = True
+
 
     except Exception as e:
         print(str(e))
@@ -199,12 +222,6 @@ def test_broadcast_message(message):
     emit('my response',
          {'data': message['data'], 'count': session['receive_count']},
          broadcast=True)
-
-@socketio.on('my wicket', namespace='/test')
-def wicket(message):
-    response = dict()
-    response['data'] = 'wicket'
-    emit('my response', response, broadcast=True)
 
 
 def init_player_one(name):

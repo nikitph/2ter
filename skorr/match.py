@@ -29,3 +29,7 @@ class Match:
             return self.team_one
         elif team == 2:
             return self.team_two
+
+    def get_next_player(self, index):
+        player_list = self.team_one.keys()
+        return player_list[index]
