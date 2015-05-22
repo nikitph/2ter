@@ -1,9 +1,7 @@
 from flask import Flask, render_template, request, url_for, redirect, session
-import time
 from tinydb import TinyDB, where
 from flask.ext.socketio import SocketIO, emit, join_room, leave_room, \
     close_room, disconnect
-from threading import Thread
 from gevent import monkey
 from emailer import EmailAssistant
 from match import Match
@@ -18,7 +16,6 @@ app.debug = True
 app.config['SECRET_KEY'] = 'secret!'
 db = TinyDB('skorr.json')
 socketio = SocketIO(app)
-thread = None
 overs = 20
 match = None
 
@@ -111,21 +108,9 @@ def sc_get():
     return render_template('scorecard.html')
 
 
-def background_thread():
-    count = 0
-    while True:
-        time.sleep(10)
-        count += 1
-
-
 @app.route('/')
 def index():
-    global thread
     session['mtotal'] = 0
-
-    if thread is None:
-        thread = Thread(target=background_thread)
-        thread.start()
     return render_template('index.html')
 
 @app.route('/confirm', methods=['POST'])
