@@ -14,6 +14,8 @@
 
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
             socket.on('connect', function () {
+                socket.emit('my event', {data: 'I\'m connected!'});
+
             });
 
             // event handler for server sent data
