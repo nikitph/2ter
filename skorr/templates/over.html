@@ -14,7 +14,7 @@
 
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
             socket.on('connect', function () {
-                socket.emit('my event', {data: 'I\'m connected!'});
+                socket.emit('my event', {data: 'I\'m connected!', invalid: false, noball: false, wide: false, bye: false, legbye: false, wicket:false});
 
             });
 
