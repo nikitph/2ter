@@ -5,6 +5,7 @@ from flask.ext.socketio import SocketIO, emit, join_room, leave_room, \
     close_room, disconnect
 from threading import Thread
 from gevent import monkey
+from emailer import EmailAssistant
 from match import Match
 from player import Player
 
@@ -126,6 +127,14 @@ def index():
         thread = Thread(target=background_thread)
         thread.start()
     return render_template('index.html')
+
+@app.route('/confirm', methods=['POST'])
+def confirm_post():
+    email = EmailAssistant()
+    email.emailers('alpha@nikitph.com', 'nikitph@gmail.com', request.form['email'], request.form['email'])
+    return render_template('confirm.html',
+                           message='Thank you for your interest in Skorr. We will let you know as soon as we have an announcement')
+
 
 
 def is_valid_delivery():
