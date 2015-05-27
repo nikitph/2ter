@@ -67,12 +67,21 @@ def opening_get():
 @app.route('/opening', methods=['POST'])
 def opening_post():
     id = db.insert(request.form)
-    return redirect('/pitch')
+    return redirect('/pitch/team1')
 
 
-@app.route('/pitch', methods=['GET'])
-def pitch_get():
-    return render_template('pitch.html', arr=json.dumps(session['team1']), arr2=json.dumps(session['team2']))
+@app.route('/pitch/<team>', methods=['GET'])
+def pitch_get(team):
+    ar1 = 'team1'
+    ar2 = 'team2'
+    session['playing'] = 1
+
+    if team == 'team2':
+        ar1 = 'team2'
+        ar2 = 'team1'
+        session['playing'] = 2
+
+    return render_template('pitch.html', arr=json.dumps(session[ar1]), arr2=json.dumps(session[ar2]))
 
 
 @app.route('/pitch', methods=['POST'])
@@ -141,7 +150,7 @@ def test_message(message):
     try:
         run = int(message['data'])
         session['mtotal'] = session.get('mtotal', 0) + run
-        striker = match.get_player(session['striker'])
+        striker = match.get_player(session['striker'], session['playing'])
         if isNoBall:
             if message['nbe']:
                 update_striker(run-1)
@@ -164,11 +173,11 @@ def test_message(message):
                 response['endofinnings'] = True
             if not response['endofinnings']:
                 if message['stikerout']:
-                    session['striker'] = match.get_next_player(session['currentwickets'] + 2)
+                    session['striker'] = match.get_next_player(session['currentwickets'] + 2, session['playing'])
                     session['playerone'] = session['striker']
 
                 else:
-                    session['nonstriker'] = match.get_next_player(session['currentwickets'] + 2)
+                    session['nonstriker'] = match.get_next_player(session['currentwickets'] + 2, session['playing'])
                     session['playertwo'] = session['nonstriker']
 
         else:
@@ -179,16 +188,16 @@ def test_message(message):
             session['validdeliveries'] += 1
 
         scorecard_dict = []
-        for p in match.get_all_players(1):
-            temp = match.get_player(p)
+        for p in match.get_all_players(session['playing']):
+            temp = match.get_player(p, session['playing'])
             scorecard_dict.append(temp.return_runs())
 
         response['scorecard'] = scorecard_dict
         response['playerone'] = session['playerone']
-        player_1 = match.get_player(session['playerone'])
+        player_1 = match.get_player(session['playerone'], session['playing'])
         response['playeroneruns'] = player_1.total()
         response['playertwo'] = session['playertwo']
-        player_2 = match.get_player(session['playertwo'])
+        player_2 = match.get_player(session['playertwo'], session['playing'])
         response['playertworuns'] = player_2.total()
         response['endofover'] = False
 

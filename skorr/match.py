@@ -17,12 +17,15 @@ class Match:
             self.team_two[j] = pl
         pass
 
-    def get_player(self, name):
+    def get_player(self, name, team):
         """
 
         :rtype : Player
         """
-        return self.team_one.get(name)
+        if team ==1:
+            return self.team_one.get(name)
+        else:
+            return self.team_two.get(name)
 
     def get_all_players(self, team):
         if team == 1:
@@ -30,6 +33,9 @@ class Match:
         elif team == 2:
             return self.team_two
 
-    def get_next_player(self, index):
-        player_list = self.team_one.keys()
+    def get_next_player(self, index, team):
+        if team ==1:
+            player_list = self.team_one.keys()
+        else:
+            player_list = self.team_two.keys()
         return player_list[index]
