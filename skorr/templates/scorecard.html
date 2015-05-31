@@ -23,10 +23,10 @@
             socket.on('my response', function (msg) {
                 var a = '';
                 var sourc = msg.scorecard;
-                var options = {source: JSON.stringify(sourc)};
+                var options = {source: sourc};
                 Materialize.toast(msg.count + ': ' + msg.data, 1000);
                 var tbl = $('#commentary');
-                    var jsonHtmlTable = ConvertJsonToTable(sourc, 'jsonTable', null, 'Download');
+                var jsonHtmlTable = ConvertJsonToTable(sourc, 'jsonTable', null, 'Download');
                 tbl.html(jsonHtmlTable);
 
 
@@ -42,7 +42,45 @@
         <div class="section">
 
 
-            <!--   Icon Section   -->
+            <div class="row">
+                <div class="col s12 m3">
+                    <div class="icon-block">
+                        <br>
+                    </div>
+                </div>
+
+
+                <div class="col s12 m6 z-depth-5" id="team1">
+                    <div class="icon-block center">
+                        <div id="header">
+                            <table>
+                                <thead>
+                                <tr>
+                                    <th>Name</th>
+                                                                        <th></th>
+                                    <th></th>
+
+                                    <th>dots</th>
+                                    <th>ones</th>
+                                    <th>Twos</th>
+                                    <th>threes</th>
+                                    <th>fours</th>
+                                    <th>Sixes</th>
+                                    <th>Total</th>
+
+                                </tr>
+                                </thead>
+                                </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="col s12 m3">
+                    <div class="icon-block">
+                        <br>
+                    </div>
+                </div>
+
+            </div>
             <div class="row">
                 <div class="col s12 m3">
                     <div class="icon-block">

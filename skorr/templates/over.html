@@ -14,7 +14,15 @@
 
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
             socket.on('connect', function () {
-                socket.emit('my event', {data: 'I\'m connected!', invalid: false, noball: false, wide: false, bye: false, legbye: false, wicket:false});
+                socket.emit('my event', {
+                    data: 'I\'m connected!',
+                    invalid: false,
+                    noball: false,
+                    wide: false,
+                    bye: false,
+                    legbye: false,
+                    wicket: false
+                });
 
             });
 
@@ -24,17 +32,15 @@
                 var a = ''
                 Materialize.toast(msg.count + ': ' + msg.data, 1000);
                 $('#runs').find('tr').append('<td><h4>' + msg.data + '</h4></td>');
-                $('#num').html('<a class="btn-floating btn-large red">' + msg.mtotal + '</a>');
+                $('#team4').html(msg.mtotal + '/' + msg.wickets + '<br>' + msg.overs + '.' + msg.deliveries + ' Overs');
                 $('#team3').html(msg.playerone + ' : ' + msg.playeroneruns + ' <br>' + msg.playertwo + ' : ' + msg.playertworuns);
 
-                if (msg.endofover)
-                {
+                if (msg.endofover) {
                     Materialize.toast('End of over', 1000);
                     $('#runs').find('tr').delay(5000).html('');
                 }
 
-                if(msg.endofinnings)
-                {
+                if (msg.endofinnings) {
                     $('#runs').html('<p>End of Innings </p>');
                     window.location = "/pitch/team2";
                 }
@@ -44,7 +50,15 @@
             // handlers for the different forms in the page
             // these send data to the server in a variety of ways
             $('form#emit').submit(function (event) {
-                socket.emit('my event', {data: $('#emit_data').val(), invalid: false, noball: false, wide: false, bye: false, legbye: false, wicket:false});
+                socket.emit('my event', {
+                    data: $('#emit_data').val(),
+                    invalid: false,
+                    noball: false,
+                    wide: false,
+                    bye: false,
+                    legbye: false,
+                    wicket: false
+                });
                 return false;
             });
             $('form#broadcast').submit(function (event) {
@@ -80,7 +94,15 @@
             // this is specially important when using the global namespace
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
 
-            socket.emit('my event', {data: i, invalid: false, noball: false, wide: false, bye: false, legbye: false, wicket:false});
+            socket.emit('my event', {
+                data: i,
+                invalid: false,
+                noball: false,
+                wide: false,
+                bye: false,
+                legbye: false,
+                wicket: false
+            });
             return false;
         }
 
@@ -91,7 +113,15 @@
             // this is specially important when using the global namespace
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
 
-            socket.emit('my event', {data: sel.value, invalid: false, noball: false, wide: false, bye: true, legbye: false , wicket:false });
+            socket.emit('my event', {
+                data: sel.value,
+                invalid: false,
+                noball: false,
+                wide: false,
+                bye: true,
+                legbye: false,
+                wicket: false
+            });
             initSelec(sel);
             return false;
         }
@@ -105,10 +135,19 @@
             var selval = sel.value;
             var run = selval.split(' ');
             var strikerout = false;
-            if(run[1] =='')
+            if (run[1] == '')
                 strikerout = true;
 
-            socket.emit('my event', {data: run[0], invalid: false, noball: false, wide: false, bye: false, legbye: false, wicket:true, strikerout:strikerout });
+            socket.emit('my event', {
+                data: run[0],
+                invalid: false,
+                noball: false,
+                wide: false,
+                bye: false,
+                legbye: false,
+                wicket: true,
+                strikerout: strikerout
+            });
             initSelec(sel);
             return false;
         }
@@ -120,7 +159,15 @@
             // this is specially important when using the global namespace
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
 
-            socket.emit('my event', {data: sel.value, invalid: false, noball: false, wide: false, bye: false, legbye: true, wicket:false });
+            socket.emit('my event', {
+                data: sel.value,
+                invalid: false,
+                noball: false,
+                wide: false,
+                bye: false,
+                legbye: true,
+                wicket: false
+            });
             initSelec(sel);
             return false;
         }
@@ -133,7 +180,15 @@
             // this is specially important when using the global namespace
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
 
-            socket.emit('my event', {data: sel.value, invalid: true, wide: true, noball:false, bye: false, legbye: false, wicket:false});
+            socket.emit('my event', {
+                data: sel.value,
+                invalid: true,
+                wide: true,
+                noball: false,
+                bye: false,
+                legbye: false,
+                wicket: false
+            });
             initSelec(sel);
             return false;
         }
@@ -147,9 +202,18 @@
             var selval = sel.value;
             var run = selval.split(' ');
             var nbe = false;
-            if(run[1] =='nbe')
+            if (run[1] == 'nbe')
                 nbe = true;
-            socket.emit('my event', {data: run[0], invalid: true, noball: true, wide : false, bye: false, legbye: false, noballextra:nbe, wicket:false});
+            socket.emit('my event', {
+                data: run[0],
+                invalid: true,
+                noball: true,
+                wide: false,
+                bye: false,
+                legbye: false,
+                noballextra: nbe,
+                wicket: false
+            });
             initSelec(sel);
             return false;
         }
@@ -170,19 +234,14 @@
 
             <div class="row">
                 <div class="col s12 m3">
-                    <div class="icon-block">
-                        <br>
-                    </div>
-                </div>
-                <div class="col s12 m3" id="team3">
-                    Striker : 1
                     <br>
-                    non-Striker : 2
                 </div>
-            </div>
-            <div class="col s12 m3">
-                <div class="icon-block">
+                <div class="col s5 m3" id="team3">
+                </div>
+                 <div class="col s1 m3">
                     <br>
+                </div>
+                <div class="col s5 m3" id="team4">
                 </div>
             </div>
         </div>
@@ -326,11 +385,6 @@
             </div>
 
         </div>
-    </div>
-
-    <div class="fixed-action-btn" style="top: 60px; right: 60px;" id="num">
-        <a class="btn-floating btn-large red">
-        </a>
     </div>
 
 {% endblock %}

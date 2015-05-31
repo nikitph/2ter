@@ -216,6 +216,9 @@ def test_message(message):
     response['data'] = message['data']
     response['count'] = session['receive_count']
     response['mtotal'] = session['mtotal']
+    response['wickets'] = session['currentwickets']
+    response['overs'] = session['currentovers']
+    response['deliveries'] = session['validdeliveries']
     emit('my response', response, broadcast=True)
 
 
