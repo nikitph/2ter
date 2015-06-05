@@ -9,6 +9,7 @@ class Player:
     threes = 0
     fours = 0
     sixes = 0
+    balls = 0
     out = False
     how = ''
     bowler = ''
@@ -40,6 +41,7 @@ class Player:
 
     def update_runs(self, run):
         if True:
+            self.balls += 1
             if run == 0:
                 self.dots += 1
             elif run == 1:
@@ -68,5 +70,6 @@ class Player:
                 self.threes,
                 self.fours,
                 self.sixes,
-                self.total()]
+                self.total(),
+                self.balls]
         return runs

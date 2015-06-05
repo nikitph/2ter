@@ -15,7 +15,8 @@
             // this is specially important when using the global namespace
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
             socket.on('connect', function () {
-                socket.emit('my event', {data: ' '});
+                var mid = {{ mtch }};
+                socket.emit('join', {room: mid });
             });
 
             // event handler for server sent data
@@ -67,6 +68,8 @@
                                     <th>fours</th>
                                     <th>Sixes</th>
                                     <th>Total</th>
+                                                                        <th>Balls</th>
+
 
                                 </tr>
                                 </thead>

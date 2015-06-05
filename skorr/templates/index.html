@@ -3,7 +3,7 @@
 {% block content %}
 
     <div class="container">
-        <form action="/confirm" method="post">
+        <form action="/teams" method="get">
             <div class="section">
 
                 <!--   Icon Section   -->
@@ -17,16 +17,10 @@
 
                     <div class="col s12 m6 z-depth-5" id="team1">
                         <div class="icon-block">
-                            <div class="input-field">
-
-                                <i class="mdi-communication-email orange-text prefix"></i>
-                                <input id="email" type="email" class="validate" name="email"
-                                   placeholder="Submit your email address for latest updates">
-                            </div>
                             <div class="center">
                                 <button class="btn-flat waves-effect waves-light orange darken-1 white-text"
                                         type="submit"
-                                        name="action" value="Send">Submit
+                                        name="action" value="Send">Start Match
                                     <i class="mdi-content-send right"></i>
                                 </button>
                             </div>
@@ -52,26 +46,30 @@
 
                     <div class="col s12 m6 z-depth-5" id="team1">
                         <div class="icon-block">
-                            <div class="card-panel white">
-                                <h5 class="center green-text">
-                                    What is Skorr?
-                                </h5>
-                            <span class="grey-text">
-                                Cricket happens to be an awesome game. Its a religion for a bunch (Around 2 Billion) of people. Budding cricketers
-                                play on small roads and grounds in thousands of matches all over the globe. What Skorr aims is to ease scoring of such impromptu matches. All you need is a smartphone and you are on.
-                                In our beta phase we will start by tracking batsman stats. Our apologies to the bowlers. We promise to support you soon.
-                             </span>
 
-                                 <h5 class="center deep-orange-text">
-                                    What we are not:
-                                </h5>
+                            <ul class="collapsible" data-collapsible="accordion">
+                                <li>
+                                    <div class="collapsible-header green-text"><i class="mdi-action-help green-text"></i>What is Skorr?
+                                    </div>
+                                    <div class="collapsible-body grey-text"><p>Cricket happens to be an awesome game. Its a
+                                        religion for a bunch (Around 2 Billion) of people. Budding cricketers
+                                        play on small roads and grounds in thousands of matches all over the globe. What
+                                        Skorr aims is to ease scoring of such impromptu matches. All you need is a
+                                        smartphone and you are on.
+                                        In our beta phase we will start by tracking batsman stats. Our apologies to the
+                                        bowlers. We promise to support you soon.
+                                    </p></div>
+                                </li>
+                                <li>
+                                    <div class="collapsible-header red-text"><i class="mdi-action-info"></i>What we are not:
+                                    </div>
+                                    <div class="collapsible-body grey-text"><p>We don't plan to be a cricket stats database for
+                                        international/first class/state level matches. Our focus is strictly local.</p>
+                                    </div>
+                                </li>
+                            </ul>
 
-                                <span class="grey-text">
-                                We don't plan to be a cricket stats database for international/first class/state level matches. Our focus is strictly local
-                                </span>
 
-
-                            </div>
                         </div>
                     </div>
                     <div class="col s12 m3">

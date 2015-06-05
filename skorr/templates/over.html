@@ -14,6 +14,7 @@
 
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
             socket.on('connect', function () {
+                socket.emit('join', {room: ''});
                 socket.emit('my event', {
                     data: 'I\'m connected!',
                     invalid: false,
@@ -29,15 +30,18 @@
             // event handler for server sent data
             // the data is displayed in the "Received" section of the page
             socket.on('my response', function (msg) {
-                var a = ''
+                var a = '';
+                if (msg.playing == 2) {
+                    a = '<br>' + 'Chasing :' + msg.mtotalone;
+                }
                 Materialize.toast(msg.count + ': ' + msg.data, 1000);
                 $('#runs').find('tr').append('<td><h4>' + msg.data + '</h4></td>');
-                $('#team4').html(msg.mtotal + '/' + msg.wickets + '<br>' + msg.overs + '.' + msg.deliveries + ' Overs');
+                $('#team4').html(msg.mtotal + '/' + msg.wickets + '<br>' + msg.overs + '.' + msg.deliveries + ' Overs' + a);
                 $('#team3').html(msg.playerone + ' : ' + msg.playeroneruns + ' <br>' + msg.playertwo + ' : ' + msg.playertworuns);
 
                 if (msg.endofover) {
                     Materialize.toast('End of over', 1000);
-                    $('#runs').find('tr').delay(5000).html('');
+                    $('#runs').find('tr').delay(5000).html('<td><h4> </h4></td>');
                 }
 
                 if (msg.endofinnings) {
@@ -238,7 +242,7 @@
                 </div>
                 <div class="col s5 m3" id="team3">
                 </div>
-                 <div class="col s1 m3">
+                <div class="col s1 m3">
                     <br>
                 </div>
                 <div class="col s5 m3" id="team4">
@@ -386,6 +390,13 @@
 
         </div>
     </div>
+    
+    <footer class="page-footer orange lighten-2">
+        <div class="container white-text">
+            © Skorr
+            <a class="right black-text" href="/match/" + {{ mtch }}>More Links</a>
+        </div>
+    </footer>
 
 {% endblock %}
 

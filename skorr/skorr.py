@@ -1,3 +1,4 @@
+from random import randint
 from flask import Flask, render_template, request, url_for, redirect, session
 from tinydb import TinyDB, where
 from flask.ext.socketio import SocketIO, emit, join_room, leave_room, \
@@ -12,12 +13,14 @@ monkey.patch_all()
 import json
 
 app = Flask(__name__)
-app.debug = True
+app.debug = False
 app.config['SECRET_KEY'] = 'secret!'
 db = TinyDB('skorr.json')
 socketio = SocketIO(app)
 overs = 20
 match = None
+replay =[]
+matchid = randint(10000000, 99999999)
 
 
 @app.route('/teams')
@@ -92,13 +95,14 @@ def pitch_post():
     session['nonstriker'] = request.form['nonstriker']
     session['playertwo'] = request.form['nonstriker']
     session['validdeliveries'] = 0
+    session['mtotalone'] = 0
 
     return redirect('/over')
 
 
 @app.route('/over', methods=['GET'])
 def over_get():
-    return render_template('over.html')
+    return render_template('over.html', mtch=str(matchid))
 
 
 @app.route('/over', methods=['POST'])
@@ -107,14 +111,15 @@ def over_post():
     return render_template('confirm.html', message=id)
 
 
-@app.route('/commentary', methods=['GET'])
-def comm_get():
-    return render_template('commentary.html')
+@app.route('/commentary/<mid>', methods=['GET'])
+def comm_get(mid):
+    global replay
+    return render_template('commentary.html', msg=json.dumps(replay), mtch=str(mid))
 
 
-@app.route('/scorecard', methods=['GET'])
-def sc_get():
-    return render_template('scorecard.html')
+@app.route('/scorecard/<mid>', methods=['GET'])
+def sc_get(mid):
+    return render_template('scorecard.html', mtch=str(mid))
 
 
 @app.route('/')
@@ -129,6 +134,9 @@ def confirm_post():
     return render_template('confirm.html',
                            message='Thank you for your interest in Skorr. We will let you know as soon as we have an announcement')
 
+@app.route('/matchc/<mid>', methods=['GET'])
+def matchc_get(mid):
+    return render_template('matchcenter.html', mtch=str(mid))
 
 
 def is_valid_delivery():
@@ -171,6 +179,8 @@ def test_message(message):
             session['currentwickets'] += 1
             if session['currentwickets'] == session['wickets']:
                 response['endofinnings'] = True
+                session['mtotalone'] = session['mtotal']
+
             if not response['endofinnings']:
                 if message['stikerout']:
                     session['striker'] = match.get_next_player(session['currentwickets'] + 2, session['playing'])
@@ -208,6 +218,7 @@ def test_message(message):
             session['currentovers'] += 1
             if session['currentovers'] == session['overs']:
                 response['endofinnings'] = True
+                session['mtotalone'] = session['mtotal']
 
 
     except Exception as e:
@@ -219,7 +230,12 @@ def test_message(message):
     response['wickets'] = session['currentwickets']
     response['overs'] = session['currentovers']
     response['deliveries'] = session['validdeliveries']
-    emit('my response', response, broadcast=True)
+    response['playing'] = session['playing']
+    response['mtotalone'] = session['mtotalone']
+    global replay
+    replay.append(response)
+    print replay
+    emit('my response', response, room=str(matchid))
 
 
 @socketio.on('my broadcast event', namespace='/test')
@@ -228,6 +244,13 @@ def test_broadcast_message(message):
     emit('my response',
          {'data': message['data'], 'count': session['receive_count']},
          broadcast=True)
+
+@socketio.on('join', namespace='/test')
+def join(message):
+    join_room(message['room'])
+    emit('my response',
+         {'data': 'In rooms: ' + ', '.join(str(request.namespace.rooms))
+        })
 
 
 def init_player_one(name):
