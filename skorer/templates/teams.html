@@ -1,0 +1,108 @@
+{% extends "template.html" %}
+
+{% block script %}
+    <script>
+        $(document).ready(function () {
+            var max_fields = 10; //maximum input boxes allowed
+            var wrapper = $("#team1"); //Fields wrapper
+            var wrappertwo = $("#team2");
+            var add_button = $("#add_field_button"); //Add button ID
+            var add_button_two = $("#add_field_button_two");
+
+            var x = 1; //initlal text box count
+            var y = 1;
+            $(add_button).click(function (e) { //on add input button click
+                e.preventDefault();
+                if (x < max_fields) { //max input box allowed
+                    x++; //text box increment
+                    $(wrapper).append('<div class="input-field"><i class="small mdi-action-account-circle orange-text prefix"></i> <input id="player" type="text" name="player1_'+x+'" placeholder="enter player name here"></div>'); //add input box
+                }
+            });
+            $(add_button_two).click(function (e) { //on add input button click
+                e.preventDefault();
+                if (y < max_fields) { //max input box allowed
+                    y++; //text box increment
+                    $(wrappertwo).append('<div class="input-field"><i class="small mdi-action-account-circle orange-text prefix"></i> <input id="player2" type="text" name="player2_'+y+'" placeholder="enter player name here"></div>'); //add input box
+                }
+            });
+            $(wrapper).on("click", ".remove_field", function (e) { //user click on remove text
+                e.preventDefault();
+                $(this).parent('div').remove();
+                x--;
+            })
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+
+    <div class="container">
+        <form action="/teams" method="post">
+            <div class="section">
+
+                <!--   Icon Section   -->
+                <div class="row">
+                    <div class="col s12 m5 z-depth-5" id="team1">
+                        <div class="icon-block">
+                            <h6 class="center condensed-thin">Team-1</h6>
+
+                            <div class="center">
+                                <button id="add_field_button"
+                                        class="btn-flat waves-effect waves-light orange darken-1 white-text">Add another
+                                    player
+                                </button>
+                            </div>
+                            <div class="input-field">
+                                <i class="small mdi-action-account-circle orange-text prefix"></i>
+                                <input id="player" type="text" name="player1_1"
+                                       placeholder="enter player name here">
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="col s12 m2">
+                        <div class="icon-block">
+                            <br>
+                        </div>
+                    </div>
+                    <div class="col s12 m5 z-depth-5" id="team2">
+                        <div class="icon-block">
+                            <h6 class="center condensed-thin">Team-2</h6>
+
+                            <div class="center">
+                                <button id="add_field_button_two"
+                                        class="btn-flat waves-effect waves-light orange darken-1 white-text">Add another
+                                    player
+                                </button>
+                            </div>
+                            <div class="input-field">
+                                <i class="small mdi-action-account-circle orange-text prefix"></i>
+                                <input id="player2" type="text" name="player2_1"
+                                       placeholder="enter player name here">
+                            </div>
+                        </div>
+
+                </div>
+            </div>
+                <div class="row">
+                    <div class="center">
+                                <br>
+                                 <button class="btn waves-effect waves-light green darken-1 white-text z-depth-4" type="submit"
+                                    name="action" value="Send">Submit
+                                <i class="mdi-content-send right"></i>
+                            </button>
+                            </div>
+
+                </div>
+                </div>
+        </form>
+    </div>
+
+    <footer class="page-footer red">
+            <div class="container white-text center">
+            Players need to be entered in batting order only!
+            </div>
+    </footer>
+
+{% endblock %}

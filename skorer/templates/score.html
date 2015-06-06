@@ -1,0 +1,51 @@
+{% extends "template.html" %}
+
+{% block content %}
+
+    <div class="container">
+        <form action="/confirm" method="post">
+            <div class="section">
+
+                <!--   Icon Section   -->
+                <div class="row">
+                    <div class="col s12 m1">
+                        <div class="icon-block">
+                            <br>
+                        </div>
+                    </div>
+
+
+                    <div class="col s12 m10 z-depth-5" id="rcorners6">
+                        <div class="icon-block">
+                            <div class="input-field">
+
+                                <i class="mdi-action-settings-power orange-text prefix"> please select one of the
+                                    actions below</i>
+                                <span> please select one of the actions below</span>
+                            </div>
+
+                            <div class="center" id="main">
+                                6
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col s12 m3">
+                        <div class="icon-block">
+                            <br>
+                            <a class="btn-floating btn-small waves-effect waves-light red"><i
+                                    class="mdi-content-add"></i></a>
+                            <a class="btn-floating btn-small waves-effect waves-light red"> 4</a>
+                            <a class="btn-floating btn-small waves-effect waves-light red"><i
+                                    class="mdi-content-add"></i></a>
+                            <a class="btn-floating btn-small waves-effect waves-light red"><i
+                                    class="mdi-content-add"></i></a>
+
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </form>
+    </div>
+
+{% endblock %}

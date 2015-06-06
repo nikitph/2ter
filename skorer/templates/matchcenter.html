@@ -1,0 +1,70 @@
+{% extends "template.html" %}
+{% block script %}
+
+     <script type="text/javascript"
+            src="http://cdnjs.cloudflare.com/ajax/libs/socket.io/0.9.16/socket.io.min.js"></script>
+    <script type="text/javascript" charset="utf-8">
+        $(document).ready(function () {
+
+
+
+    namespace = '/test'; // change to an empty string to use the global namespace
+
+    // the socket.io documentation recommends sending an explicit package upon connection
+    // this is specially important when using the global namespace
+    var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
+    socket.on('connect', function () {
+        var mat = {{ mtch }};
+        socket.emit('join', {room: mat });
+        var msg = {{ msg|safe }};
+        for (var i = 0 ; i < msg.length; i ++)
+        {
+            b = msg[i];
+            $('#commentary').prepend('<a class="collection-item">' + b.overs + '.' + b.deliveries + ': ' + b.data +'</a>');
+
+        }
+
+    });
+
+    // event handler for server sent data
+    // the data is displayed in the "Received" section of the page
+    socket.on('my response', function (msg) {
+        $('#commentary').prepend('<a class="collection-item">' + msg.overs + '.' + msg.deliveries + ': ' + msg.data +'</a>');
+
+    });
+})
+    </script>
+
+{% endblock %}
+
+{% block content %}
+
+    <div class="container">
+        <form action="" method="">
+            <div class="section">
+
+
+                <!--   Icon Section   -->
+                <div class="row">
+                    <div class="col s12 m12 z-depth-5" id="team1">
+                            <ul class="tabs">
+                                <li class="tab col s3"><a href="#test1">Teams</a></li>
+                                <li class="tab col s3"><a class="active" href="#test2">Commentary</a></li>
+                                <li class="tab col s3"><a href="#test3">Scorecard</a></li>
+                                <li class="tab col s3"><a href="#test4">Ball By Ball</a></li>
+                            </ul>
+                        </div>
+                        <div id="test1" class="col s12">
+                             <div id="commentary" class="collection">
+                                Match started
+                            </div>
+                        </div>
+                        <div id="test2" class="col s12">Test 2</div>
+                        <div id="test3" class="col s12">Test 3</div>
+                        <div id="test4" class="col s12">Test 4</div>
+                    </div>
+                </div>
+        </form>
+    </div>
+
+{% endblock %}

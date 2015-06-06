@@ -1,0 +1,74 @@
+{% extends "template.html" %}
+{% block script %}
+
+     <script type="text/javascript"
+            src="http://cdnjs.cloudflare.com/ajax/libs/socket.io/0.9.16/socket.io.min.js"></script>
+    <script type="text/javascript" charset="utf-8">
+        $(document).ready(function () {
+
+
+
+    namespace = '/test'; // change to an empty string to use the global namespace
+
+    // the socket.io documentation recommends sending an explicit package upon connection
+    // this is specially important when using the global namespace
+    var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
+    socket.on('connect', function () {
+        var mat = {{ mtch }};
+        socket.emit('join', {room: mat });
+        var msg = {{ msg|safe }};
+        for (var i = 0 ; i < msg.length; i ++)
+        {
+            b = msg[i];
+            $('#commentary').prepend('<a class="collection-item">' + b.overs + '.' + b.deliveries + ': ' + b.data +'</a>');
+
+        }
+
+    });
+
+    // event handler for server sent data
+    // the data is displayed in the "Received" section of the page
+    socket.on('my response', function (msg) {
+        var a = '';
+        Materialize.toast(msg.count + ': ' + msg.data, 1000);
+                $('#commentary').prepend('<a class="collection-item">' + msg.overs + '.' + msg.deliveries + ': ' + msg.data +'</a>');
+
+    });
+})
+    </script>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="container">
+        <div class="section">
+
+
+            <!--   Icon Section   -->
+            <div class="row">
+                <div class="col s12 m3">
+                    <div class="icon-block">
+                        <br>
+                    </div>
+                </div>
+
+
+                <div class="col s12 m6 z-depth-5" id="team1">
+                    <div class="icon-block center">
+                        <div id="commentary" class="collection">
+                            Match started
+                        </div>
+                    </div>
+                </div>
+                <div class="col s12 m3">
+                    <div class="icon-block">
+                        <br>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+</div>
+
+{% endblock %}

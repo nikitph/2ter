@@ -1,0 +1,89 @@
+{% extends "template.html" %}
+{% block script %}
+    <script>
+        $(document).ready(function () {
+            var striker = {{ arr|safe }};
+            for (var i = 0; i < striker.length; i++) {
+                $('#striker').append('<option value=' + striker[i] + '>' + striker[i] + '</option>');
+                $('#nonstriker').append('<option value=' + striker[i] +'>' + striker[i] + '</option>');
+
+            }
+
+            var keeper = {{ arr2|safe }};
+            for (var i = 0; i < keeper.length; i++) {
+                $('#keeper').append('<option value=1>' + keeper[i] + '</option>');
+                $('#bowler').append('<option value=1>' + keeper[i] + '</option>');
+
+            }
+
+
+            $('select').material_select();
+
+        });
+
+
+    </script>
+{% endblock %}
+
+{% block content %}
+
+    <div class="container">
+        <form action="/pitch" method="post">
+            <div class="section">
+
+                <!--   Icon Section   -->
+                <div class="row">
+                    <div class="col s12 m3">
+                        <div class="icon-block">
+                            <br>
+                        </div>
+                    </div>
+
+
+                    <div class="col s12 m6 z-depth-5" id="team1">
+                        <div class="icon-block">
+                            <div class="input-field">
+                                <select id="striker" name="striker">
+                                    <option value="" disabled selected>Who's on strike?</option>
+                                </select>
+
+                                <select id="nonstriker" name="nonstriker">
+                                    <option value="" disabled selected>Who's on the bowler's end?</option>
+                                </select>
+
+                                 <select id="keeper" name="keeper">
+                                    <option value="" disabled selected>Who's the wicket keeper?</option>
+                                </select>
+
+                                 <select id="bowler" name="bowler">
+                                    <option value="" disabled selected>Who's Bowling?</option>
+                                </select>
+                            </div>
+
+                            <div class="center">
+                                <button class="btn-flat large waves-effect waves-light white orange-text"
+                                        type="submit"
+                                        name="action" value="Send">
+                                    <i class="mdi-navigation-arrow-forward large"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col s12 m3">
+                        <div class="icon-block">
+                            <br>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </form>
+    </div>
+
+{% endblock %}
+
+
+
+
+
+

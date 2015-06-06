@@ -1,0 +1,51 @@
+{% extends "template.html" %}
+{% block content %}
+
+<div class="container">
+    <form action="/match" method="post">
+        <div class="section">
+
+            <!--   Icon Section   -->
+            <div class="row">
+                <div class="col s12 m3">
+                    <div class="icon-block">
+                        <br>
+                    </div>
+                </div>
+
+
+                <div class="col s12 m6 z-depth-5" id="team1">
+                    <div class="icon-block">
+                        <div class="input-field">
+
+                            <i class="mdi-communication-email orange-text prefix"></i>
+                            <input id="overs" type="number" class="validate" name="overs"
+                                   placeholder="Enter the number of overs here">
+                        </div>
+
+                        <div class="center">
+                            <button class="btn-flat waves-effect waves-light orange darken-1 white-text" type="submit"
+                                    name="action" value="Send">Submit
+                                <i class="mdi-content-send right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col s12 m3">
+                    <div class="icon-block">
+                        <br>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+
+
+
+
+
