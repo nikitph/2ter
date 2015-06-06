@@ -17,10 +17,8 @@ app.debug = False
 app.config['SECRET_KEY'] = 'secret!'
 db = TinyDB('skorr.json')
 socketio = SocketIO(app)
-overs = 20
-match = None
-replay =[]
-matchid = randint(10000000, 99999999)
+match = {1: '1'}
+replay = {1: ['1']}
 
 
 @app.route('/teams')
@@ -30,6 +28,8 @@ def teams_get():
 
 @app.route('/teams', methods=['POST'])
 def teams_post():
+    matchid = randint(10000000, 99999999)
+    session['mid'] = matchid
     session['mtotal'] = 0
     members = request.form.values()
     allplayers = members[1:]
@@ -39,9 +39,8 @@ def teams_post():
     session['team1'] = team1
     team2 = allplayers[(size / 2):]
     session['team2'] = team2
-    match = Match(team1, team2)
+    match[matchid] = Match(team1, team2)
     session['wickets'] = (size / 2) - 1
-    id = db.insert(request.form)
     print allplayers, team1, team2
     return redirect('/match', code=302)
 
@@ -53,8 +52,6 @@ def match_get():
 
 @app.route('/match', methods=['POST'])
 def match_post():
-    id = db.insert(request.form)
-    global overs
     overs = request.form['overs']
     session['overs'] = overs
     session['currentovers'] = 0
@@ -69,8 +66,11 @@ def opening_get():
 
 @app.route('/opening', methods=['POST'])
 def opening_post():
-    id = db.insert(request.form)
-    return redirect('/pitch/team1')
+    if request.form['batting'] == 1:
+        rurl = '/pitch/team1'
+    else:
+        rurl = '/pitch/team2'
+    return redirect(rurl)
 
 
 @app.route('/pitch/<team>', methods=['GET'])
@@ -96,13 +96,14 @@ def pitch_post():
     session['playertwo'] = request.form['nonstriker']
     session['validdeliveries'] = 0
     session['mtotalone'] = 0
+    mid = session['mid']
 
-    return redirect('/over')
+    return redirect('/over/' + str(mid))
 
 
-@app.route('/over', methods=['GET'])
-def over_get():
-    return render_template('over.html', mtch=str(matchid))
+@app.route('/over/<mid>', methods=['GET'])
+def over_get(mid):
+    return render_template('over.html', mtch=mid)
 
 
 @app.route('/over', methods=['POST'])
@@ -124,7 +125,6 @@ def sc_get(mid):
 
 @app.route('/')
 def index():
-    session['mtotal'] = 0
     return render_template('index.html')
 
 @app.route('/confirm', methods=['POST'])
@@ -155,10 +155,11 @@ def test_message(message):
     isLegBye = message['legbye']
     isWicket = message['wicket']
     global match
+    mtch = match[session['mid']]
     try:
         run = int(message['data'])
         session['mtotal'] = session.get('mtotal', 0) + run
-        striker = match.get_player(session['striker'], session['playing'])
+        striker = mtch.get_player(session['striker'], session['playing'])
         if isNoBall:
             if message['nbe']:
                 update_striker(run-1)
@@ -183,11 +184,11 @@ def test_message(message):
 
             if not response['endofinnings']:
                 if message['stikerout']:
-                    session['striker'] = match.get_next_player(session['currentwickets'] + 2, session['playing'])
+                    session['striker'] = mtch.get_next_player(session['currentwickets'] + 2, session['playing'])
                     session['playerone'] = session['striker']
 
                 else:
-                    session['nonstriker'] = match.get_next_player(session['currentwickets'] + 2, session['playing'])
+                    session['nonstriker'] = mtch.get_next_player(session['currentwickets'] + 2, session['playing'])
                     session['playertwo'] = session['nonstriker']
 
         else:
@@ -198,16 +199,16 @@ def test_message(message):
             session['validdeliveries'] += 1
 
         scorecard_dict = []
-        for p in match.get_all_players(session['playing']):
-            temp = match.get_player(p, session['playing'])
+        for p in mtch.get_all_players(session['playing']):
+            temp = mtch.get_player(p, session['playing'])
             scorecard_dict.append(temp.return_runs())
 
         response['scorecard'] = scorecard_dict
         response['playerone'] = session['playerone']
-        player_1 = match.get_player(session['playerone'], session['playing'])
+        player_1 = mtch.get_player(session['playerone'], session['playing'])
         response['playeroneruns'] = player_1.total()
         response['playertwo'] = session['playertwo']
-        player_2 = match.get_player(session['playertwo'], session['playing'])
+        player_2 = mtch.get_player(session['playertwo'], session['playing'])
         response['playertworuns'] = player_2.total()
         response['endofover'] = False
 
@@ -233,9 +234,9 @@ def test_message(message):
     response['playing'] = session['playing']
     response['mtotalone'] = session['mtotalone']
     global replay
-    replay.append(response)
-    print replay
-    emit('my response', response, room=str(matchid))
+    replay[session['mid']] = response
+    print replay[session['mid']]
+    emit('my response', response, room=session['mid'])
 
 
 @socketio.on('my broadcast event', namespace='/test')
