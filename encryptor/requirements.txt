@@ -1,0 +1,11 @@
+Envelopes==0.4
+Flask==0.10.1
+gunicorn==18.0
+itsdangerous==0.24
+Jinja2==2.7.3
+MarkupSafe==0.23
+requests==2.4.3
+simplejson==3.6.5
+tinydb==2.2.2
+Werkzeug==0.10.4
+
