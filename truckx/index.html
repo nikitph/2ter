@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fleet Command</title>
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --panel: rgba(255, 255, 255, 0.92);
+    --border: rgba(20, 30, 50, 0.08);
+    --ink: #172033;
+    --ink-2: #5b6578;
+    --ink-3: #8a93a3;
+    --blue: #2f6bff;
+    --blue-soft: #e8efff;
+    --green: #16a36a;
+    --green-soft: #e4f6ee;
+    --amber: #e8960c;
+    --amber-soft: #fff3dc;
+    --red: #e5484d;
+    --red-soft: #fde8e8;
+    --shadow: 0 6px 24px rgba(22, 32, 51, 0.08), 0 1px 2px rgba(22, 32, 51, 0.06);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 13px; }
+  #world { position: fixed; inset: 0; display: block; }
+  .panel { position: absolute; background: var(--panel); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+  .muted { color: var(--ink-2); }
+  .faint { color: var(--ink-3); }
+  .mono { font-family: var(--mono); }
+  button { font: inherit; cursor: pointer; }
+
+  /* ---------- top bar ---------- */
+  #topbar { top: 16px; left: 16px; display: flex; align-items: center; gap: 10px; padding: 8px 10px; }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 6px; border-right: 1px solid var(--border); font-weight: 800; letter-spacing: -0.02em; font-size: 15px; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #2f6bff, #19c3a0); display: grid; place-items: center; color: white; font-size: 14px; font-weight: 900; }
+  .brand small { font-weight: 600; color: var(--ink-3); font-size: 11px; letter-spacing: 0; }
+  .fleet { display: flex; align-items: center; gap: 8px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 10px; }
+  .chip { font-family: var(--mono); font-size: 11px; font-weight: 700; background: var(--blue); color: white; padding: 3px 6px; border-radius: 6px; }
+  .fleet b { display: block; font-size: 13px; }
+  .fleet span { font-size: 11px; }
+  .live { display: flex; align-items: center; gap: 6px; background: var(--green-soft); color: var(--green); padding: 5px 10px; border-radius: 999px; font-weight: 700; font-size: 12px; }
+  .live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 1.6s infinite; }
+  .live .mono { color: var(--ink); font-weight: 600; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(22,163,106,.5); } 70% { box-shadow: 0 0 0 7px rgba(22,163,106,0); } 100% { box-shadow: 0 0 0 0 rgba(22,163,106,0); } }
+  .speed { display: flex; gap: 2px; background: #f1f2f5; padding: 2px; border-radius: 8px; }
+  .speed button { border: 0; background: transparent; padding: 4px 8px; border-radius: 6px; font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
+  .speed button.on { background: white; color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.1); font-weight: 700; }
+  .bell { position: relative; border: 0; background: transparent; padding: 6px; border-radius: 8px; }
+  .bell:hover { background: #f1f2f5; }
+  .bell .badge { position: absolute; top: 1px; right: 0; background: var(--red); color: white; font-size: 9px; font-weight: 800; min-width: 15px; height: 15px; border-radius: 8px; display: none; place-items: center; padding: 0 3px; }
+  .bell .badge.show { display: grid; }
+
+  /* ---------- alerts ---------- */
+  #alerts { top: 78px; left: 16px; width: 320px; padding: 12px; max-height: calc(100vh - 290px); display: flex; flex-direction: column; }
+  .alerts-head { display: flex; gap: 10px; align-items: center; }
+  .shield { width: 34px; height: 34px; border-radius: 9px; background: var(--blue-soft); color: var(--blue); display: grid; place-items: center; flex: none; transition: background .3s, color .3s; }
+  .shield.hot { background: var(--red-soft); color: var(--red); }
+  .eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--ink-3); text-transform: uppercase; }
+  .alerts-head h3 { margin: 1px 0 0; font-size: 15px; }
+  #alertSub { font-size: 11.5px; margin-top: 6px; }
+  #alertList { list-style: none; margin: 8px 0 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .alert { display: grid; grid-template-columns: 8px 1fr auto; gap: 9px; align-items: start; padding: 9px 10px; border-radius: 10px; background: #fafafb; border: 1px solid var(--border); cursor: pointer; animation: slidein .35s cubic-bezier(.2,.9,.3,1.2); transition: background .15s, opacity .3s; }
+  .alert:hover { background: white; border-color: rgba(47,107,255,.3); }
+  .alert.resolved { opacity: .45; }
+  .alert .sev { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; }
+  .alert .sev.red { background: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+  .alert .sev.amber { background: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+  .alert .sev.blue { background: var(--blue); box-shadow: 0 0 0 3px var(--blue-soft); }
+  .alert b { font-size: 12.5px; display: block; }
+  .alert .meta { font-size: 11px; color: var(--ink-2); margin-top: 2px; }
+  .alert .src { font-family: var(--mono); font-size: 10px; color: var(--ink-3); margin-top: 3px; display: flex; gap: 6px; align-items: center; }
+  .alert .act { font-size: 11px; font-weight: 700; color: var(--blue); border: 0; background: var(--blue-soft); padding: 4px 7px; border-radius: 6px; white-space: nowrap; }
+  @keyframes slidein { from { transform: translateX(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* ---------- freight flow ---------- */
+  #flow { left: 16px; bottom: 16px; padding: 12px 14px; display: flex; gap: 14px; align-items: stretch; }
+  .flow-main { min-width: 470px; }
+  .flow-title { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 13px; margin-bottom: 12px; gap: 16px; }
+  .flow-title .mono { font-weight: 500; font-size: 11px; color: var(--ink-3); }
+  .stages { display: grid; grid-template-columns: repeat(5, 1fr); position: relative; }
+  .stages::before { content: ""; position: absolute; top: 15px; left: 10%; right: 10%; height: 2px; background: linear-gradient(90deg, var(--blue), #19c3a0); opacity: .35; }
+  .stage { text-align: center; position: relative; }
+  .stage .ic { width: 30px; height: 30px; margin: 0 auto; border-radius: 50%; background: var(--blue); color: white; display: grid; place-items: center; box-shadow: 0 0 0 4px white; transition: transform .2s; }
+  .stage .ic.bump { transform: scale(1.25); }
+  .stage .lbl { font-size: 11px; color: var(--ink-2); margin-top: 6px; }
+  .stage .val { font-family: var(--mono); font-size: 12px; font-weight: 700; margin-top: 2px; }
+  .flow-side { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; min-width: 190px; background: #fbfcfb; display: flex; flex-direction: column; justify-content: center; }
+  .flow-side .ok { font-family: var(--mono); color: var(--green); font-size: 11px; font-weight: 700; }
+  .flow-side .big { font-family: var(--mono); font-size: 14px; font-weight: 800; margin-top: 4px; }
+  .flow-side .sm { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); margin-top: 2px; }
+
+  /* ---------- KPIs right ---------- */
+  #kpis { top: 16px; right: 16px; padding: 6px; display: flex; gap: 4px; }
+  .kpi { padding: 6px 12px; border-radius: 10px; min-width: 92px; }
+  .kpi + .kpi { border-left: 1px solid var(--border); border-radius: 0; }
+  .kpi .k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); font-weight: 700; }
+  .kpi .v { font-family: var(--mono); font-size: 16px; font-weight: 800; margin-top: 2px; }
+  .kpi .v small { font-size: 10px; color: var(--ink-3); font-weight: 600; }
+  .kpi .v.good { color: var(--green); }
+
+  /* ---------- truck card ---------- */
+  #card { top: 78px; right: 16px; width: 340px; padding: 0; overflow: hidden; transform: translateX(380px); transition: transform .45s cubic-bezier(.2,.9,.25,1); max-height: calc(100vh - 100px); overflow-y: auto; }
+  #card.open { transform: none; }
+  .card-head { padding: 14px 14px 10px; display: flex; gap: 10px; align-items: center; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: white; flex: none; }
+  .card-head h3 { margin: 0; font-size: 15px; }
+  .card-head .sub { font-size: 11.5px; color: var(--ink-2); margin-top: 2px; }
+  .x { margin-left: auto; border: 0; background: #f1f2f5; width: 26px; height: 26px; border-radius: 7px; color: var(--ink-2); align-self: flex-start; }
+  .cam { position: relative; margin: 0 14px; border-radius: 10px; overflow: hidden; background: #0d1320; aspect-ratio: 16 / 9; }
+  .cam canvas { width: 100%; height: 100%; display: block; }
+  .cam .osd { position: absolute; inset: 0; background: linear-gradient(rgba(0,0,0,.35), transparent 22%, transparent 80%, rgba(0,0,0,.4)); pointer-events: none; font-family: var(--mono); color: white; font-size: 10px; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+  .cam .osd .tl { position: absolute; top: 7px; left: 8px; display: flex; gap: 6px; align-items: center; }
+  .cam .osd .rec { width: 7px; height: 7px; border-radius: 50%; background: #ff4d4f; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .cam .osd .tr { position: absolute; top: 7px; right: 8px; }
+  .cam .osd .bl { position: absolute; bottom: 7px; left: 8px; }
+  .cam .osd .br { position: absolute; bottom: 7px; right: 8px; }
+  .cam .osd .event { position: absolute; left: 50%; top: 32%; transform: translateX(-50%); background: rgba(229,72,77,.92); padding: 5px 9px; border-radius: 6px; font-weight: 700; font-size: 11px; display: none; white-space: nowrap; }
+  .cam .osd .event.show { display: block; animation: slidein .3s; }
+  .cam .osd .box { position: absolute; border: 1.5px solid #39e29b; border-radius: 3px; left: 42%; top: 46%; width: 16%; height: 20%; display: none; }
+  .cam .osd .box span { position: absolute; top: -14px; left: -1px; background: #39e29b; color: #062; padding: 0 4px; font-size: 9px; font-weight: 700; text-shadow: none; }
+  .cam .osd .box.show { display: block; }
+  .cam .osd .box.warn { border-color: #ff4d4f; }
+  .cam .osd .box.warn span { background: #ff4d4f; color: white; }
+  .camtabs { display: flex; gap: 4px; margin: 8px 14px 0; }
+  .camtabs button { flex: 1; border: 1px solid var(--border); background: white; border-radius: 7px; padding: 5px; font-size: 11px; color: var(--ink-2); }
+  .camtabs button.on { background: var(--ink); color: white; border-color: var(--ink); }
+  .sect { padding: 12px 14px 0; }
+  .sect h4 { margin: 0 0 8px; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); display: flex; justify-content: space-between; }
+  .rings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .ring { text-align: center; }
+  .ring svg { width: 56px; height: 56px; }
+  .ring .rl { font-size: 10px; color: var(--ink-2); margin-top: 2px; }
+  .duty { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: #eef0f3; margin-top: 4px; }
+  .duty i { display: block; height: 100%; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat { background: #f7f8fa; border-radius: 9px; padding: 8px 10px; }
+  .stat .k { font-size: 10px; color: var(--ink-3); font-weight: 600; }
+  .stat .v { font-family: var(--mono); font-weight: 800; font-size: 14px; margin-top: 2px; }
+  .load { border: 1px dashed rgba(20,30,50,.18); border-radius: 10px; padding: 9px 10px; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 11.5px; }
+  .load b { font-size: 12.5px; }
+  .bar { height: 5px; background: #eef0f3; border-radius: 3px; grid-column: 1 / -1; margin-top: 6px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--blue), #19c3a0); border-radius: 3px; }
+  .actions { display: flex; gap: 6px; padding: 12px 14px 14px; }
+  .actions button { flex: 1; border: 1px solid var(--border); background: white; border-radius: 9px; padding: 8px; font-weight: 700; font-size: 12px; }
+  .actions button.primary { background: var(--blue); color: white; border-color: var(--blue); }
+  .actions button:hover { filter: brightness(.97); }
+
+  /* ---------- world labels ---------- */
+  #labels { position: fixed; inset: 0; pointer-events: none; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: white; border-radius: 6px; padding: 3px 7px; font-family: var(--mono); font-size: 10.5px; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.12); white-space: nowrap; display: flex; align-items: center; gap: 5px; pointer-events: auto; cursor: pointer; transition: background .2s, color .2s; }
+  .tag::after { content: ""; position: absolute; left: 50%; bottom: -4px; width: 8px; height: 8px; background: inherit; transform: translateX(-50%) rotate(45deg); z-index: -1; }
+  .tag .d { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .tag .d.dock { background: var(--blue); }
+  .tag .d.warn { background: var(--amber); }
+  .tag .d.alarm { background: var(--red); }
+  .tag.sel { background: var(--ink); color: white; }
+  .tag.alarm { background: var(--red); color: white; }
+  .tag.alarm .d { background: white; }
+  .tag .hos { font-weight: 500; color: var(--ink-3); }
+  .tag.sel .hos, .tag.alarm .hos { color: rgba(255,255,255,.7); }
+  .place { position: absolute; transform: translate(-50%, -100%); font-size: 10.5px; font-weight: 700; color: var(--ink-2); background: rgba(255,255,255,.8); padding: 2px 7px; border-radius: 999px; white-space: nowrap; border: 1px solid var(--border); }
+  .place .mono { color: var(--ink-3); font-weight: 600; }
+
+  #hint { position: absolute; right: 16px; bottom: 16px; padding: 8px 12px; font-size: 11px; color: var(--ink-2); }
+  #hint kbd { font-family: var(--mono); background: #f1f2f5; border-radius: 4px; padding: 1px 5px; font-size: 10px; color: var(--ink); }
+
+  #toast { position: absolute; left: 50%; top: 18px; transform: translate(-50%, -80px); padding: 10px 14px; display: flex; gap: 10px; align-items: center; transition: transform .4s cubic-bezier(.2,.9,.3,1.2); font-weight: 600; }
+  #toast.show { transform: translate(-50%, 0); }
+
+  @media (max-width: 900px) {
+    #kpis { display: none; }
+    #flow { left: 16px; right: 16px; overflow-x: auto; }
+    .flow-side { display: none; }
+    .flow-main { min-width: 0; width: 100%; }
+    #alerts { width: calc(100vw - 32px); max-height: 160px; }
+    #card { left: 16px; right: 16px; width: auto; top: auto; bottom: 16px; max-height: 70vh; transform: translateY(110%); z-index: 3; }
+    #hint { display: none; }
+    .fleet span, .brand small { display: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="world"></canvas>
+<div id="labels"></div>
+
+<div id="topbar" class="panel">
+  <div class="brand"><div class="brand-mark">X</div><div>TruckX<br><small>Fleet Command</small></div></div>
+  <div class="fleet">
+    <span class="chip">WC-1</span>
+    <div><b>West Coast Linehaul</b><span class="muted" id="fleetSub">12/12 trucks rolling · 12 AI dashcams</span></div>
+  </div>
+  <div class="live"><span class="dot"></span>Live <span class="mono" id="clock">06:10</span></div>
+  <div class="speed" id="speed">
+    <button data-s="0">❚❚</button><button data-s="1" class="on">1×</button><button data-s="4">4×</button><button data-s="12">12×</button>
+  </div>
+  <button class="bell" id="bell" title="Alerts">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+    <span class="badge" id="badge">0</span>
+  </button>
+</div>
+
+<div id="kpis" class="panel">
+  <div class="kpi"><div class="k">Safety score</div><div class="v good" id="kSafety">94</div></div>
+  <div class="kpi"><div class="k">HOS compliant</div><div class="v" id="kHos">12<small>/12</small></div></div>
+  <div class="kpi"><div class="k">Avg MPG</div><div class="v" id="kMpg">7.4</div></div>
+  <div class="kpi"><div class="k">Idle today</div><div class="v" id="kIdle">3.1<small>%</small></div></div>
+</div>
+
+<div id="alerts" class="panel">
+  <div class="alerts-head">
+    <div class="shield" id="shield"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+    <div><div class="eyebrow">AI Safety &amp; Compliance</div><h3 id="alertTitle">No open alerts</h3></div>
+  </div>
+  <div id="alertSub" class="muted">Watching 12 dashcams and 12 ELDs across I-80, I-5 and the yard</div>
+  <ul id="alertList"></ul>
+</div>
+
+<div id="flow" class="panel">
+  <div class="flow-main">
+    <div class="flow-title"><span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px;margin-right:4px"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>
+      Freight flow</span><span class="mono">Port → Customer · live loads</span></div>
+    <div class="stages" id="stages"></div>
+  </div>
+  <div class="flow-side">
+    <div class="ok" id="flowOk">On schedule end to end</div>
+    <div class="big" id="flowBig">96.4% on-time today</div>
+    <div class="sm" id="flowSm">31 delivered · 1 late</div>
+    <div class="sm">Target 95% · 412k mi YTD</div>
+  </div>
+</div>
+
+<div id="card" class="panel">
+  <div class="card-head">
+    <div class="avatar" id="cAvatar">MR</div>
+    <div><h3 id="cName">Maria Reyes</h3><div class="sub" id="cSub">TX-101 · Freightliner Cascadia</div></div>
+    <button class="x" id="cClose" title="Close (Esc)">✕</button>
+  </div>
+  <div class="cam">
+    <canvas id="dashcam"></canvas>
+    <div class="osd">
+      <div class="tl"><span class="rec"></span><span id="camLbl">ROAD · LIVE</span></div>
+      <div class="tr" id="camTime">06:10:22</div>
+      <div class="bl" id="camGps">37.42N 121.91W</div>
+      <div class="br" id="camSpd">62 MPH</div>
+      <div class="event" id="camEvent">HARSH BRAKING · −0.48g</div>
+      <div class="box" id="camBox"><span id="camBoxLbl">VEHICLE 38m</span></div>
+    </div>
+  </div>
+  <div class="camtabs"><button class="on" data-v="road">Road-facing</button><button data-v="chase">Chase cam</button><button data-v="sky">Drone</button></div>
+  <div class="sect">
+    <h4><span>Hours of service · ELD</span><span id="cDuty" style="color:var(--green)">Driving</span></h4>
+    <div class="rings" id="cRings"></div>
+    <div class="duty" id="cDutyBar"></div>
+  </div>
+  <div class="sect">
+    <h4><span>Vehicle</span><span id="cVin" class="mono" style="text-transform:none;letter-spacing:0">VIN …4471</span></h4>
+    <div class="grid2">
+      <div class="stat"><div class="k">Speed</div><div class="v" id="cSpeed">62 mph</div></div>
+      <div class="stat"><div class="k">Fuel</div><div class="v" id="cFuel">71%</div></div>
+      <div class="stat"><div class="k">Driver score</div><div class="v" id="cScore">96</div></div>
+      <div class="stat"><div class="k">Engine</div><div class="v" id="cEngine" style="color:var(--green)">OK</div></div>
+    </div>
+  </div>
+  <div class="sect">
+    <h4><span>Current load</span><span id="cBol" class="mono" style="text-transform:none;letter-spacing:0">BOL 88213</span></h4>
+    <div class="load">
+      <b id="cRoute">Port of Oakland → Reno DC</b><span class="mono" id="cEta">ETA 07:42</span>
+      <span class="muted" id="cCargo">Electronics · 38,200 lb · Trailer TR-14</span><span class="mono faint" id="cMiles">84 mi</span>
+      <div class="bar"><i id="cBar" style="width:40%"></i></div>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="cFollow" class="primary">Follow truck</button>
+    <button id="cMsg">Message driver</button>
+  </div>
+</div>
+
+<div id="toast" class="panel"></div>
+<div id="hint" class="panel">Click a truck · drag to pan · <kbd>scroll</kbd> zoom · <kbd>Space</kbd> pause · <kbd>Esc</kbd> back</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }
+</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
