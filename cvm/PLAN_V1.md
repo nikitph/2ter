@@ -81,6 +81,60 @@ pass it through to `run_cvm(..., max_objects=)`. It's a 5-line change.
 
 Done when: `results/llm_base-*.json` exist for WS=32 and WS=4.
 
+### M0b: Does the method lift small models? (no training; do right after M0)
+
+The question: **is CVM plus the method enough to make a small model perform
+far above its normal capability?** If so, the context wall is not the limit we
+assume it is, and small models are underestimated.
+
+Run 1.5–3B and 7–8B open models through CVM at 10⁶ objects, each in four
+cells:
+
+| Cell | Flags | What it isolates |
+|---|---|---|
+| plain | (none) | raw processing ability inside the substrate |
+| hint | `--hint` (`METHOD_HINT` in the system prompt) | how much knowing the method adds |
+| plain, WS=4 | `--max-objects 4` | does it keep notes under pressure? |
+| hint, WS=4 | `--hint --max-objects 4` | both |
+
+```bash
+for m in <small-model> <7-8b-model>; do
+  for hint in "" "--hint"; do
+    python experiments/run_llm.py --provider openai-compatible --base-url http://localhost:8000/v1 \
+       --api-key-env VLLM_KEY --model $m --sizes 1000000 --tasks 100 --conditions cvm $hint \
+       --tag m0b-$m${hint:+-hint}
+  done
+done
+```
+
+Reference points:
+
+- DeepSeek-V4.1-Flash, plain: 0.70 accuracy, 0.40 on root cause.
+- Reference processor (a script with zero intelligence): 1.00.
+
+To make the "above its capability" claim concrete, also run the **same small
+model without CVM**. Use the full-context condition at a world size that fits
+its window (e.g. 10³), or the tool-calling condition (`--conditions agent`) at
+10⁴. The headline result would be: *small model + CVM + method at 10⁶ ≥ the
+same model without CVM at 10³.*
+
+How to read the outcomes:
+
+- **Hinted small model ≈ DeepSeek-Flash or better:** the method carries most
+  of the work, and V1 fine-tuning on a small model is the main bet.
+- **Hint helps a lot but stays well below:** fine-tuning (M3) should close
+  the gap; prioritize recovery examples.
+- **Hint barely helps:** the bottleneck is per-step reasoning. Prioritize M6
+  (recursion), which breaks hard steps into smaller ones.
+
+**Code needed:** the `--max-objects` flag from M0. `METHOD_HINT` is
+domain-specific (incident debugging). For `domain2`, write the equivalent hint
+for code repos so the comparison is fair.
+
+Done when: a table of accuracy, root-cause accuracy, notes per task,
+verifier-rejection rate and capability faults, for each model × cell, is
+added to `RESULTS_V1.md`.
+
 ### M1: Trajectory dataset exporter
 
 Create `experiments/export_trajectories.py`. It runs the `ReferenceReasoner`
@@ -227,6 +281,56 @@ Do this only if SFT plateaus below target, especially on `traps` or `domain2`.
 - The risk is reward hacking via citation stuffing. The verifier only checks
   that cited facts were materialized, so add a penalty on support-set size.
 
+### M6 (proposed): Recursive contexts, where reasoning becomes a call
+
+**Idea.** A hard reasoning step doesn't have to happen inside one prompt. It
+can be another bounded context. The parent issues a `CALL`, and the runtime:
+
+1. spawns a child context with a narrow task, a subset of the parent's
+   capabilities and a fresh bounded working set seeded with the handed-over
+   refs;
+2. runs the same processor on it;
+3. verifies the child's answer against the child's own ledger;
+4. returns the result to the parent as a single fact, whose provenance points
+   at the child context.
+
+The parent's view never grows. The spec already anticipates this (§22, context
+inheritance), and `CognitiveContext.spawn()` already does capability
+subsetting.
+
+```
+CALL(task="Did service://x's anomaly start before 14:20Z?", refs=[service://x],
+     expect="YES|NO")                      -> [fact:N] CALL#3 = YES   (provenance: ctx://0042)
+```
+
+**Why it matters.** Any task becomes a tree of small steps, each within a small
+model's competence. What is left for the model is choosing good decompositions
+and getting leaf steps right. Leaf steps such as comparing two timestamps are
+trivial once isolated. They can even be routed to a deterministic `COMPUTE`
+op.
+
+**What to measure:**
+
+- accuracy vs. recursion depth;
+- per-call accuracy, since errors compound (p per step over n steps is roughly
+  p^n unless verification catches them);
+- total tokens across the tree vs. a flat run;
+- whether small models with `CALL` match large models without it.
+
+**Code needed:**
+
+- a `CALL` op in `runtime.py`: depth limit, per-call step and token budget,
+  `expect` schema validation, result-as-fact with child provenance;
+- capability checks so a child can never gain authority (`spawn()` already
+  ensures this);
+- a `--recursion` flag in `run_llm.py`;
+- tests for depth limits, provenance, and capability narrowing across levels.
+
+Start with depth ≤ 2.
+
+**Done when:** small-model accuracy with and without `CALL` is reported on
+`iid`, `deep` and `domain2`.
+
 ## 3. Risks and how the plan handles them
 
 | Risk | Mitigation |
@@ -249,6 +353,7 @@ cd cvm && claude
 Suggested prompt sequence, one milestone per session or per PR:
 
 1. *"Read CLAUDE.md and PLAN_V1.md. Do M0's code change (`--max-objects` in run_llm.py) with a test. Then run the reference processor at WS=4 through run_llm.py's reference provider to sanity-check."*
+   Then: *"Run M0b against my local vLLM models and write the table."*
 2. *"Implement M1: experiments/export_trajectories.py with the recovery perturbations and a replay test. Generate a 2k-task sample and show me stats."*
 3. *"Implement M2: depth_range in synthetic_world, the traps split, and the domain2 code-repo world with ground truth. Verify the reference processor scores 1.00 on every split."*
 4. *"Implement M3's v1/train_lora.py and v1/requirements.txt. Don't run training here; give me the exact command for my GPU box."* Then run training on the GPU machine.
@@ -280,8 +385,10 @@ fine-tuning service.
 ## 7. Checklist
 
 - [ ] M0: `--max-objects` flag; base model at WS=32 and WS=4 on 10⁶ (n≥100)
+- [ ] M0b: small vs 7–8B model × {plain, hint} × {WS=32, WS=4} at 10⁶, plus same small model without CVM at 10³
 - [ ] M1: `export_trajectories.py` + replay test + `data/v1/{train,val}.jsonl`
 - [ ] M2: `depth_range`, `traps`, `tight`, `domain2` (`synthetic_code_world.py`); reference = 1.00 on all splits
 - [ ] M3: `v1/train_lora.py`, `v1/requirements.txt`; adapter with ≥95% op accuracy on val
 - [ ] M4: `--split` flag; eval matrix; `RESULTS_V1.md` with charts
 - [ ] M5 (optional): RL refinement if SFT plateaus
+- [ ] M6 (proposed): `CALL` op for recursive child contexts; small model with/without recursion

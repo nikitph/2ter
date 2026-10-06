@@ -20,8 +20,9 @@ The original spec is in `docs/SPEC.md`; user-facing docs are in `README.md`.
 **Status: V0 is done and validated. V1 (training a model to fault instead of
 guess) is planned in `PLAN_V1.md` and not started.**
 
-- Branch: `claude/cvm-core-thesis-3azicg` in `nikitph/2ter`. Draft PR:
-  https://github.com/nikitph/2ter/pull/2
+- Repo: `nikitph/2ter`. V0 was merged to `master` via
+  https://github.com/nikitph/2ter/pull/2. Do follow-up work on a new branch
+  from `master`.
 - The rest of the `2ter` repo (skorer, truckx, …) is unrelated. Stay inside `cvm/`.
 
 ## Headline results (details in RESULTS_V0.md; don't restate numbers elsewhere without re-checking)
@@ -54,6 +55,11 @@ guess) is planned in `PLAN_V1.md` and not started.**
 - They are a practitioner, not an academic. They want things that work and can
   be introduced and used. They don't want research-methodology detours. Keep
   the framing practical, but stay honest about limits: one line, not a lecture.
+- Their framing: CVM is about cracking the **context wall**. If a model's
+  useful capability no longer depends on fitting the world into context, the
+  capability frontier (especially of small models) needs reassessing. V0
+  supports "context volume isn't the driver; processing is". The next
+  questions are M0b and M6.
 - They want V1 runnable locally with Claude Code. `PLAN_V1.md` §4 has the
   prompt sequence.
 - They asked for a **public repo** for CVM. The GitHub integration could not
@@ -180,8 +186,11 @@ Other flags: `--hint` adds `METHOD_HINT` to the system prompt;
 
 ## Known weaknesses and open items (prioritized)
 
-1. **V1**, per `PLAN_V1.md`: M0 baselines → M1 exporter → M2 splits (incl.
-   second domain) → M3 LoRA → M4 eval.
+1. **V1**, per `PLAN_V1.md`: M0 baselines → **M0b small-model + method test**
+   (the owner's main interest: can CVM plus the method make small models
+   perform far above their size?) → M1 exporter → M2 splits (incl. second
+   domain) → M3 LoRA → M4 eval → M6 recursive `CALL` contexts (the owner's
+   idea: hard reasoning steps become recursive bounded calls).
 2. **`ClaudeProcessor` has never been run live.** It uses `output_config`
    JSON-schema structured output and is tested only against a mock. The first
    live run may need fixes; check `stop_reason` handling and the schema's
