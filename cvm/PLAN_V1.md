@@ -541,8 +541,8 @@ fine-tuning service.
 - [x] M0 (code): `--max-objects` flag + tests; data-driven depth/kind summaries; reference sanity at WS=32/4 (1.00 everywhere)
 - [ ] M0 (models): base model at WS=32 and WS=4 on 10⁶ (n≥100) — needs a served endpoint
 - [ ] M0b: `full` condition in `run_llm.py`; small vs 7–8B model × {plain, hint} × {WS=32, WS=4} at 10⁶, plus same small model without CVM at 10³
-- [ ] M1: `export_trajectories.py` + replay test + `data/v1/{train,val}.jsonl`
-- [ ] M2: `depth_range`, `traps`, `tight`, `domain2` (`synthetic_code_world.py` + `CodeReferenceReasoner`, validation only); reference = 1.00 on all splits
+- [x] M1: `export_trajectories.py` + replay test + `data/v1/{train,val}.jsonl`
+- [x] M2: `depth_range`, `traps`, `tight`, `domain2` (`synthetic_code_world.py` + `CodeReferenceReasoner`, validation only); reference = 1.00 on all splits
 - [ ] M3: `v1/train_lora.py`, `v1/requirements.txt`; adapter with ≥95% op accuracy on val
 - [ ] M4: `--split` flag; eval matrix; `RESULTS_V1.md` with charts
 - [ ] M5 (optional): RL refinement if SFT plateaus

@@ -320,7 +320,7 @@ class RunLLMTests(unittest.TestCase):
     def test_rejects_bad_arguments(self):
         from experiments import run_llm
         with self.assertRaises(SystemExit):
-            run_llm.main(["--provider", "reference", "--conditions", "full"])
+            run_llm.main(["--provider", "reference", "--conditions", "rag"])
         with self.assertRaises(SystemExit):
             run_llm.main(["--provider", "reference", "--max-objects", "0"])
 

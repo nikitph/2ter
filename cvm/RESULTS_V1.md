@@ -76,3 +76,24 @@ the runtime, check the answer, and verify exported actions and split seeds.
 The generated `data/v1/` files are ignored by Git (about 1.9 GB). They can be
 regenerated with the command above. This dataset is ready for the first small
 training trial; the model baselines and model training remain pending.
+
+## M2: Held-out split reference checks
+
+`python3 experiments/v1_splits.py --tasks 100` passed all cells. The machine-
+readable output is `results/v1_reference_splits.json`.
+
+| Split | World objects | Working set | Correct | Step limits |
+|---|---:|---:|---:|---:|
+| iid (10³) | 1,015 | 32 | 100/100 | 0 |
+| iid (10⁶) | 999,991 | 32 | 100/100 | 0 |
+| scale | 999,991 | 32 | 100/100 | 0 |
+| deep (depth 4–5) | 1,219 | 32 | 100/100 | 0 |
+| traps | 1,103 | 32 | 100/100 | 0 |
+| tight | 999,991 | 4 | 100/100 | 0 |
+| domain2 (code repositories) | 999 | 32 | 100/100 | 0 |
+
+The code-repository world has a separate prompt-only `CodeReferenceReasoner`
+for this solvability check. It is never used to create M1 training examples.
+The `full` condition in `run_llm.py` also passed a three-task reference smoke
+test at 10³ objects (one step each), and marked all three tasks infeasible
+when its model-window limit was set below the estimated prompt length.

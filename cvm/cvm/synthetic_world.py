@@ -145,9 +145,10 @@ def _build_platform(b: _Builder, rng: random.Random):
                    "person://platform-oncall", rng.randint(0, MINUTES_30D))
 
 
-def _build_cluster(b: _Builder, rng: random.Random, k: int):
-    depth = 1 + (k % 3)
-    names = rng.sample(SERVICE_NAMES, 5)
+def _build_cluster(b: _Builder, rng: random.Random, k: int,
+                   depth_range: tuple[int, int] = (1, 3), traps: bool = False):
+    depth = depth_range[0] + (k % (depth_range[1] - depth_range[0] + 1))
+    names = rng.sample(SERVICE_NAMES, max(5, depth + (3 if traps else 2)))
     svcs = [f"service://{n}-k{k}" for n in names]
     teams = [f"team://t{k}a", f"team://t{k}b"]
     people = [f"person://u{k}-{i}" for i in range(3)]
@@ -165,26 +166,31 @@ def _build_cluster(b: _Builder, rng: random.Random, k: int):
     root = depth
 
     owners = [rng.choice(teams) for _ in svcs]
-    deps: dict[int, list[str]] = {i: [] for i in range(5)}
-    for i in range(4):
+    deps: dict[int, list[str]] = {i: [] for i in range(len(svcs))}
+    for i in range(len(svcs) - 1):
         deps[i].append(svcs[i + 1])
-        for j in range(i + 2, 5):
+        for j in range(i + 2, len(svcs)):
             if rng.random() < 0.3:
                 deps[i].append(svcs[j])
-    for i in range(5):
+    if traps:
+        for i in (depth + 1, depth + 2):
+            if svcs[i] not in deps[0]:
+                deps[0].append(svcs[i])
+            starts[i] = starts[1] + (i - depth)
+    for i in range(len(svcs)):
         if rng.random() < 0.5:
             deps[i].append(f"service://{rng.choice(PLATFORM)}")
     # A noisy dependency: anomaly that begins *after* the incident (retry storm).
     noisy = None
-    if depth < 4 and rng.random() < 0.6:
-        candidates = [i for i in range(depth + 1, 5)]
+    if not traps and depth + 1 < len(svcs) and rng.random() < 0.6:
+        candidates = [i for i in range(depth + 1, len(svcs))]
         if candidates:
             noisy = rng.choice(candidates)
 
     for i, svc in enumerate(svcs):
         n = names[i]
         cfg, met = f"config://{n}-k{k}", f"metrics://{n}-k{k}"
-        status = "degraded" if 0 < i <= depth or i == 0 else "healthy"
+        status = "degraded" if i in starts else "healthy"
         rels = [("OWNED_BY", owners[i]), ("RUNS_ON", f"host://h{k}-{i}"),
                 ("HAS_CONFIG", cfg), ("HAS_METRICS", met)]
         rels += [("DEPENDS_ON", d) for d in deps[i]]
@@ -194,7 +200,7 @@ def _build_cluster(b: _Builder, rng: random.Random, k: int):
         b.obj(cfg, "config", f"{n}-k{k} config",
               {f: rng.randint(*r) for f, r in CONFIG_FIELDS.items()}, [("OF", svc)])
         base = rng.randint(20, 80)
-        if i <= depth:
+        if i in starts:
             _metrics(b, met, svc, base, iso_(starts[i]), base * rng.randint(8, 30))
         elif i == noisy:
             _metrics(b, met, svc, base, iso_(T + rng.randint(2, 20)), base * 3)
@@ -224,11 +230,17 @@ def _build_cluster(b: _Builder, rng: random.Random, k: int):
            rng.choice(people), a_root - rng.randint(180, 2000))
     _event(b, rng, f"deploy://{rn}-k{k}-mitigation", "deploy", root_svc, root_cfg,
            rng.choice(people), a_root + rng.randint(3, 60))
+    if traps:
+        _event(b, rng, f"change://{rn}-k{k}-post-anomaly", "change", root_svc,
+               root_cfg, rng.choice(people), a_root + rng.randint(1, max(1, T - a_root - 1)))
     # affected-service trap: a change minutes before the incident
     n0 = names[0]
     trap = f"change://{n0}-k{k}-trap"
     _event(b, rng, trap, "change", svcs[0], f"config://{n0}-k{k}", rng.choice(people),
            rng.randint(starts[root] + 1, T - 1) if T - starts[root] > 2 else T - 1)
+    if traps:
+        _event(b, rng, f"deploy://{n0}-k{k}-trap", "deploy", svcs[0],
+               f"config://{n0}-k{k}", rng.choice(people), T - rng.randint(1, 3))
 
     inc = f"incident://inc-k{k}"
     b.obj(inc, "incident", f"elevated errors on {names[0]}-k{k}",
@@ -263,11 +275,16 @@ def iso_(m: int) -> str:
     return iso(m)
 
 
-def build_world(n_objects: int, seed: int = 7, cache_dir: str | None = None) -> WorldInfo:
+def build_world(n_objects: int, seed: int = 7, cache_dir: str | None = None,
+                depth_range: tuple[int, int] = (1, 3), traps: bool = False) -> WorldInfo:
     """Build (or reuse) a world with approximately ``n_objects`` objects."""
+    lo, hi = depth_range
+    if lo < 1 or hi < lo or hi > len(SERVICE_NAMES) - 3:
+        raise ValueError("depth_range must fit the available services")
     cache_dir = cache_dir or os.environ.get("CVM_CACHE", os.path.join(os.path.dirname(__file__), "..", ".cache"))
     os.makedirs(cache_dir, exist_ok=True)
-    path = os.path.join(cache_dir, f"world_n{n_objects}_s{seed}.sqlite")
+    variant = "" if depth_range == (1, 3) and not traps else f"_d{lo}-{hi}_t{int(traps)}"
+    path = os.path.join(cache_dir, f"world_n{n_objects}_s{seed}{variant}.sqlite")
     if os.path.exists(path):
         return world_info(path)
     tmp = path + ".tmp"
@@ -281,7 +298,7 @@ def build_world(n_objects: int, seed: int = 7, cache_dir: str | None = None) -> 
     platform_objs = b.next_id - 1
     n_clusters = max(1, round((n_objects - platform_objs) / OBJECTS_PER_CLUSTER))
     for k in range(n_clusters):
-        _build_cluster(b, random.Random(f"{seed}-{k}"), k)
+        _build_cluster(b, random.Random(f"{seed}-{k}"), k, depth_range, traps)
         if len(b.objs) > 50_000:
             b.flush()
     b.flush()

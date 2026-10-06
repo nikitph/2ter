@@ -352,6 +352,78 @@ class ReferenceReasoner:
         return _Policy(parse_prompt(prompt)).decide()
 
 
+class _CodePolicy:
+    """Prompt-only reference policy for the held-out code-repository domain."""
+
+    def __init__(self, kb: KB):
+        self.kb = kb
+        self.writes: dict[str, str] = {}
+
+    def fields(self, ref: str, field: str) -> tuple[list[str], list[str]]:
+        key = f"code:{ref}.{field}"
+        note = self.kb.notes.get(key)
+        if note is not None:
+            values, _, ids = note.partition("|")
+            values = values.strip()
+            return ([] if values == "-" else values.split(",")), [x.strip() for x in ids.split(",") if x.strip()]
+        if ref not in self.kb.objects:
+            raise Need({"op": "FAULT", "ref": ref, "reason": f"need {field} from {ref}"})
+        pairs = self.kb.fields(ref).get(field, [])
+        values = [v for v, _ in pairs]
+        ids = [fid for _, fid in pairs]
+        if "WRITE" in self.kb.ops:
+            self.writes[key] = f"{','.join(values) if values else '-'} | {','.join(ids)}"
+        return values, ids
+
+    def solve(self) -> tuple[str, list[str]]:
+        bug = self.kb.target
+        failures, f0 = self.fields(bug, "first_failure")
+        tests, f1 = self.fields(bug, "FAILING_TEST")
+        if not failures or not tests:
+            return "UNKNOWN", f0 + f1
+        files, f2 = self.fields(tests[0], "COVERS")
+        if not files:
+            return "UNKNOWN", f0 + f1 + f2
+        support = f0 + f1 + f2
+        file = files[0]
+        for _ in range(12):
+            imported, ids = self.fields(file, "IMPORTS")
+            support += ids
+            if not imported:
+                break
+            file = imported[0]
+        else:
+            return "UNKNOWN", support
+        commits, ids = self.fields(file, "CHANGED_IN")
+        support += ids
+        best: tuple[str, str, list[str]] | None = None
+        for commit in commits:
+            times, time_ids = self.fields(commit, "at")
+            if times and times[0] < failures[0] and (best is None or times[0] > best[1]):
+                best = commit, times[0], time_ids
+        if best is None:
+            return "UNKNOWN", support
+        return best[0], list(dict.fromkeys(support + best[2]))
+
+    def decide(self) -> dict:
+        try:
+            answer, support = self.solve()
+        except Need as needed:
+            if self.writes:
+                return {"op": "WRITE", "entries": self.writes}
+            return needed.action
+        if self.writes:
+            return {"op": "WRITE", "entries": self.writes}
+        return {"op": "ANSWER", "value": answer, "support": support}
+
+
+class CodeReferenceReasoner:
+    """Stateless validator for domain2; excluded from training data export."""
+
+    def step(self, prompt: str) -> dict:
+        return _CodePolicy(parse_prompt(prompt)).decide()
+
+
 class Hallucinator:
     """Asserts a plausible answer immediately, citing nothing (or made-up ids)."""
 
@@ -589,3 +661,11 @@ METHOD_HINT = """Investigation method for incidents:
    The cause is the latest change/deploy TARGETING the root service before ITS anomaly
    onset. Changes on other services, or after the onset, are not the cause.
 6. WRITE each conclusion (with fact ids) as you go; resident objects may be evicted."""
+
+CODE_METHOD_HINT = """Investigation method for code repositories:
+1. FAULT the bug and follow FAILING_TEST to the failing test, then COVERS to its entry file.
+2. Follow IMPORTS through the file chain. The terminal imported file is the root.
+3. Compare CHANGED_IN commits on that root file with the bug's first_failure time.
+   Choose the latest commit before the failure. A recent entry-file commit and a
+   post-failure root-file commit are decoys.
+4. WRITE conclusions with fact ids before objects are evicted; cite facts in ANSWER."""

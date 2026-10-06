@@ -158,3 +158,14 @@ def incident_agent_capabilities(search: bool = True, write: bool = True,
     caps += [Capability("*", ("WRITE",), deny=True)] if not write else [
         Capability("service://*", ("WRITE",), deny=True)]
     return caps
+
+
+def code_agent_capabilities(search: bool = True, write: bool = True) -> list[Capability]:
+    """Code-world capabilities; no incident-world namespace is accessible."""
+    namespaces = ("repo://", "file://", "symbol://", "commit://", "test://", "bug://")
+    caps = [Capability(ns + "*", ("READ", "TRAVERSE", "FAULT")) for ns in namespaces]
+    if search:
+        caps.append(Capability("commit://*", ("SEARCH",)))
+    if write:
+        caps.append(Capability("scratch://*", ("WRITE",)))
+    return caps

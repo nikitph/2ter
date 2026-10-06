@@ -19,26 +19,28 @@ from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cvm.experiment import make_tasks, run_agent, run_cvm  # noqa: E402
+from cvm.experiment import FullContext, make_tasks, run_agent, run_cvm  # noqa: E402
 from cvm.resolver import GraphStore  # noqa: E402
 from cvm.synthetic_world import build_world  # noqa: E402
 
 from experiments.run_scale import RESULTS, summarize  # noqa: E402
+from experiments.v1_splits import SPLITS, build_cell, cells_for  # noqa: E402
 
 
-def make_processor(args):
+def make_processor(args, domain="incident"):
     if args.provider in ("deepseek", "openai-compatible"):
         from cvm.processors import ChatCompletionsProcessor
-        from cvm.processors import METHOD_HINT
+        from cvm.processors import CODE_METHOD_HINT, METHOD_HINT
         return ChatCompletionsProcessor(model=args.model or "deepseek-chat",
                                         base_url=args.base_url, api_key_env=args.api_key_env,
-                                        system_extra=METHOD_HINT if args.hint else "")
+                                        system_extra=(CODE_METHOD_HINT if domain == "code" else METHOD_HINT)
+                                        if args.hint else "")
     if args.provider == "claude":
         from cvm.processors import ClaudeProcessor
         return ClaudeProcessor(model=args.model or "claude-opus-5-5", effort=args.effort)
     if args.provider == "reference":
-        from cvm.processors import ReferenceReasoner
-        p = ReferenceReasoner()
+        from cvm.processors import CodeReferenceReasoner, ReferenceReasoner
+        p = CodeReferenceReasoner() if domain == "code" else ReferenceReasoner()
         p.usage = {"input_tokens": 0, "output_tokens": 0, "calls": 0, "errors": 0}
         return p
     raise SystemExit(f"unknown provider {args.provider}")
@@ -59,6 +61,8 @@ def main(argv=None):
     ap.add_argument("--model", default="")
     ap.add_argument("--effort", default="low")
     ap.add_argument("--sizes", default="1000,1000000")
+    ap.add_argument("--split", choices=list(SPLITS), default=None,
+                    help="held-out V1 split; overrides --sizes and selects the domain/world variant")
     ap.add_argument("--tasks", type=int, default=30)
     ap.add_argument("--conditions", default="cvm")
     ap.add_argument("--workers", type=int, default=8)
@@ -68,6 +72,8 @@ def main(argv=None):
     ap.add_argument("--out-dir", default=RESULTS, help="where llm_<tag>.json and traces are written")
     ap.add_argument("--agent-context-limit", type=int, default=120_000,
                     help="tokens; requests above this are not sent (model window)")
+    ap.add_argument("--full-context-limit", type=int, default=128_000,
+                    help="model window for the one-step full-context baseline")
     ap.add_argument("--tag", default="")
     ap.add_argument("--hint", action="store_true", help="add the investigation-method hint")
     ap.add_argument("--base-url", default="https://api.deepseek.com",
@@ -81,48 +87,63 @@ def main(argv=None):
     if args.max_objects < 1:
         ap.error("--max-objects must be >= 1")
     conditions = args.conditions.split(",")
-    unknown = [c for c in conditions if c not in ("cvm", "agent")]
+    unknown = [c for c in conditions if c not in ("cvm", "agent", "full")]
     if unknown:
-        ap.error(f"unsupported condition(s) {unknown}; run_llm.py supports cvm and agent")
+        ap.error(f"unsupported condition(s) {unknown}; run_llm.py supports cvm, agent and full")
     if "agent" in conditions and args.max_objects != 32:
         print("note: --max-objects applies to the cvm condition only; "
               "the agent baseline keeps an unbounded transcript", file=sys.stderr)
     report = {"provider": args.provider, "model": model, "method_hint": args.hint,
               "tasks_per_size": args.tasks, "max_steps": args.max_steps,
-              "max_objects": args.max_objects, "sizes": []}
+              "max_objects": args.max_objects, "split": args.split, "sizes": []}
     os.makedirs(args.out_dir, exist_ok=True)
     traces = open(os.path.join(args.out_dir, f"llm_{tag}_traces.jsonl"), "w")
-    for n in [int(x) for x in args.sizes.split(",")]:
-        w = build_world(n)
-        store = GraphStore(w.path)
-        tasks = make_tasks(store, args.tasks, seed=n)
-        entry = {"world_objects": w.n_objects, "conditions": {}}
+    cells = cells_for(args.split) if args.split else (None,) * len(args.sizes.split(","))
+    sizes = [int(x) for x in args.sizes.split(",")] if not args.split else []
+    for i, cell in enumerate(cells):
+        if cell:
+            w, store, tasks = build_cell(cell, args.tasks)
+            domain = cell.domain
+            max_objects = cell.max_objects if cell.split == "tight" else args.max_objects
+        else:
+            n = sizes[i]
+            w = build_world(n)
+            store = GraphStore(w.path)
+            tasks = make_tasks(store, args.tasks, seed=n)
+            domain = "incident"
+            max_objects = args.max_objects
+        entry = {"world_objects": w.n_objects, "conditions": {},
+                 "split": cell.split if cell else None, "domain": domain,
+                 "max_objects": max_objects}
         for cond in conditions:
             t0 = time.time()
+            full = FullContext(store, w.n_objects, context_limit=args.full_context_limit) if cond == "full" else None
 
             def one(spec):
-                proc = make_processor(args)
+                proc = make_processor(args, domain)
                 ctxs = []
                 if cond == "cvm":
                     m = run_cvm(store, spec, proc, w.n_objects, max_steps=args.max_steps,
-                                max_objects=args.max_objects, keep_ctx=ctxs)
-                else:
+                                max_objects=max_objects, keep_ctx=ctxs)
+                elif cond == "agent":
                     m = run_agent(store, spec, proc, w.n_objects,
                                   context_limit=args.agent_context_limit,
                                   max_steps=args.max_steps, keep_ctx=ctxs)
+                else:
+                    m = full.run(spec, proc)
                 m["llm_input_tokens"] = proc.usage["input_tokens"]
                 m["llm_output_tokens"] = proc.usage["output_tokens"]
                 m["llm_calls"] = proc.usage["calls"]
                 m["llm_errors"] = proc.usage.get("errors", 0)
-                c = ctxs[0]
+                c = ctxs[0] if ctxs else full.ctx
                 print(f"  [{cond}] {spec.task.kind:<10} d={spec.depth} correct={m['correct']} "
-                      f"steps={m['steps']} answer={c.answer}", flush=True)
+                      f"steps={m['steps']} answer={m['answer']}", flush=True)
                 return m, {"world_objects": w.n_objects, "condition": cond,
                            "task": spec.task.text, "expected": spec.expected,
-                           "answer": c.answer, "support": c.answer_support,
-                           "trace": c.trace, "notes": dict(c.notes)}
+                           "answer": m["answer"], "support": list(c.answer_support) if c else [],
+                           "trace": list(c.trace) if c else [], "notes": dict(c.notes) if c else {}}
 
-            with ThreadPoolExecutor(args.workers) as ex:
+            with ThreadPoolExecutor(1 if cond == "full" else args.workers) as ex:
                 results = list(ex.map(one, tasks))
             runs = [m for m, _ in results]
             for _, tr in results:
@@ -134,25 +155,29 @@ def main(argv=None):
                 "llm_output_tokens_mean": sum(r["llm_output_tokens"] for r in runs) / len(runs),
                 "llm_calls_mean": sum(r["llm_calls"] for r in runs) / len(runs),
                 "llm_errors": sum(r["llm_errors"] for r in runs),
-                "invalid_ops_mean": sum(r["invalid_ops"] for r in runs) / len(runs),
-                "aborted": sum(r["aborted"] for r in runs),
+                "invalid_ops_mean": sum(r.get("invalid_ops", 0) for r in runs) / len(runs),
+                "aborted": sum(r.get("aborted", 0) for r in runs),
                 "abstained": sum(1 for r in runs if r["answer"] in (None, "UNKNOWN")),
                 "accuracy_by_kind": accuracy_by(runs, "kind"),
                 "accuracy_by_depth": accuracy_by(runs, "depth"),
                 "wall_seconds": round(time.time() - t0, 1),
             })
             entry["conditions"][cond] = s
+            if full:
+                s["full_context_est_tokens"] = full.est_tokens
+                s["full_context_limit"] = args.full_context_limit
             entry.setdefault("runs", []).extend(runs)
             print(f"N={w.n_objects:>8} {cond:<6} acc={s['accuracy']:.2f} "
                   f"peakObj={s['peak_resident_objects_mean']:.1f} "
                   f"peakTok={s['peak_prompt_tokens_mean']:.0f} steps={s['steps_mean']:.1f} "
-                  f"unsupported={s['unsupported_claim_rate']:.2f} thrash={s['thrash_rate_mean']:.2f} "
-                  f"faultPrec={s['fault_precision_mean']:.2f} invalid={s['invalid_ops_mean']:.1f} "
+                  f"unsupported={s['unsupported_claim_rate']:.2f} thrash={s['thrash_rate_mean'] or 0:.2f} "
+                  f"faultPrec={s['fault_precision_mean'] or 0:.2f} invalid={s['invalid_ops_mean']:.1f} "
                   f"stepLimit={s['step_limit']} aborted={s['aborted']} overflow={s['context_overflow']} "
                   f"in_tok={s['llm_input_tokens_mean']:.0f} ({s['wall_seconds']}s)", flush=True)
         report["sizes"].append(entry)
         with open(os.path.join(args.out_dir, f"llm_{tag}.json"), "w") as f:
             json.dump(report, f, indent=1, default=str)
+        store.db.close()
     traces.close()
 
 
