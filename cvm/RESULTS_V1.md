@@ -53,3 +53,26 @@ drop at 4 objects, which the M0 model baselines will measure.
 **Still pending: model baselines.** These need a served endpoint, a local vLLM
 or a hosted API key; the machine that ran this slice had neither. The commands
 are in PLAN_V1.md §M0. Each one adds a row per model × working-set size here.
+
+## M1: Trajectory exporter
+
+`python3 experiments/export_trajectories.py --tasks 10000 --out data/v1`
+completed locally. It ran 10,000 reference tasks through `CVMRuntime` with
+100% correct answers and no step limits, then wrote 254,147 training and
+50,897 validation examples. The splits use 20 training world seeds (1000–1019)
+and four distinct validation seeds (2000–2003). Both contain world sizes near
+10², 10³ and 10⁴ objects, all three task kinds, depths 1–3, SEARCH enabled and
+disabled, and working sets of 4, 8, 16 and 32 objects. Eviction recovery tasks
+also use a 2-object working set.
+
+The 305,044 examples include 6,427 recovery targets: 625 each after an
+unsupported answer, a denied operation and a useless fault, plus 4,552 after
+an eviction. The exporter deduplicated exact prompt/action pairs (none in this
+run), shuffled each split, and estimated 326 million prompt tokens. All
+exported assistant messages passed `first_json_object` and `normalize_action`
+in a streaming validation. Unit tests replay each recovery trajectory through
+the runtime, check the answer, and verify exported actions and split seeds.
+
+The generated `data/v1/` files are ignored by Git (about 1.9 GB). They can be
+regenerated with the command above. This dataset is ready for the first small
+training trial; the model baselines and model training remain pending.

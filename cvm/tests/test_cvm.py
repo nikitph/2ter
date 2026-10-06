@@ -325,5 +325,48 @@ class RunLLMTests(unittest.TestCase):
             run_llm.main(["--provider", "reference", "--max-objects", "0"])
 
 
+class TrajectoryExportTests(unittest.TestCase):
+    def test_recovery_trajectories_replay_through_runtime(self):
+        from experiments.export_trajectories import replay_trajectory, run_trajectory
+
+        for scenario in ("bad_answer", "denied", "useless_fault", "eviction"):
+            ws = 2 if scenario == "eviction" else 4
+            trajectory = run_trajectory(
+                STORE, TASKS[0], world_seed=3, world_size=WORLD.n_objects,
+                max_objects=ws, search=True, scenario=scenario,
+            )
+            self.assertEqual(trajectory.answer, TASKS[0].expected)
+            self.assertTrue(trajectory.injected)
+            self.assertTrue(any(s["meta"]["kind"] == "recovery" for s in trajectory.samples))
+            self.assertEqual(replay_trajectory(STORE, trajectory, max_objects=ws, search=True),
+                             trajectory.answer)
+
+    def test_exported_actions_parse_and_splits_have_distinct_worlds(self):
+        import json
+        from pathlib import Path
+        from cvm.processors import SYSTEM_OPENAI, first_json_object
+        from experiments.export_trajectories import export
+
+        with tempfile.TemporaryDirectory(prefix="cvm-export-test-") as root:
+            out = Path(root) / "v1"
+            stats = export(tasks=24, out=out, train_seeds=2, val_seeds=1,
+                           sizes=(100, 1000), recovery_every=4, verify_replay=True)
+            self.assertEqual(sum(stats["tasks"].values()), 24)
+            self.assertTrue(stats["recovery_from"])
+            seeds = {}
+            for split in ("train", "val"):
+                rows = [json.loads(line) for line in (out / f"{split}.jsonl").read_text().splitlines()]
+                self.assertEqual(len(rows), stats["examples"][split])
+                seeds[split] = {row["meta"]["world_seed"] for row in rows}
+                for row in rows:
+                    system, user, assistant = row["messages"]
+                    self.assertEqual(system, {"role": "system", "content": SYSTEM_OPENAI})
+                    self.assertIn("RESIDENT OBJECTS", user["content"])
+                    action = first_json_object(assistant["content"])
+                    self.assertIsNotNone(action)
+                    self.assertEqual(normalize_action(action), action)
+            self.assertTrue(seeds["train"].isdisjoint(seeds["val"]))
+
+
 if __name__ == "__main__":
     unittest.main()
