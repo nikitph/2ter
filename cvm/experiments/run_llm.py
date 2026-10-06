@@ -4,8 +4,9 @@
         --sizes 1000,1000000 --tasks 30 --conditions cvm,agent --workers 8
 
 Each CVM step is one stateless API call: the prompt is the whole state.
-Writes results/llm_<model>.json (summary + per-run metrics) and
-results/llm_<model>_traces.jsonl (operation trace of every run).
+Writes <out-dir>/llm_<tag>.json (summary + per-run metrics) and
+<out-dir>/llm_<tag>_traces.jsonl (operation trace of every run); out-dir defaults
+to results/. --max-objects sets the CVM working-set size (default 32).
 """
 from __future__ import annotations
 
@@ -43,6 +44,15 @@ def make_processor(args):
     raise SystemExit(f"unknown provider {args.provider}")
 
 
+def accuracy_by(runs: list[dict], key: str) -> dict:
+    """Accuracy per value of ``key`` (e.g. kind, depth), for whatever values occur."""
+    out = {}
+    for v in sorted({r[key] for r in runs}, key=str):
+        group = [r for r in runs if r[key] == v]
+        out[v] = sum(r["correct"] for r in group) / len(group)
+    return out
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--provider", default="deepseek")
@@ -53,6 +63,9 @@ def main(argv=None):
     ap.add_argument("--conditions", default="cvm")
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--max-steps", type=int, default=60)
+    ap.add_argument("--max-objects", type=int, default=32,
+                    help="CVM working-set size (resident objects); applies to the cvm condition only")
+    ap.add_argument("--out-dir", default=RESULTS, help="where llm_<tag>.json and traces are written")
     ap.add_argument("--agent-context-limit", type=int, default=120_000,
                     help="tokens; requests above this are not sent (model window)")
     ap.add_argument("--tag", default="")
@@ -65,15 +78,26 @@ def main(argv=None):
     model = args.model or {"deepseek": "deepseek-chat", "claude": "claude-opus-5-5"}.get(
         args.provider, args.provider)
     tag = args.tag or model
-    report = {"provider": args.provider, "model": model, "method_hint": args.hint, "tasks_per_size": args.tasks,
-              "max_steps": args.max_steps, "sizes": []}
-    traces = open(os.path.join(RESULTS, f"llm_{tag}_traces.jsonl"), "w")
+    if args.max_objects < 1:
+        ap.error("--max-objects must be >= 1")
+    conditions = args.conditions.split(",")
+    unknown = [c for c in conditions if c not in ("cvm", "agent")]
+    if unknown:
+        ap.error(f"unsupported condition(s) {unknown}; run_llm.py supports cvm and agent")
+    if "agent" in conditions and args.max_objects != 32:
+        print("note: --max-objects applies to the cvm condition only; "
+              "the agent baseline keeps an unbounded transcript", file=sys.stderr)
+    report = {"provider": args.provider, "model": model, "method_hint": args.hint,
+              "tasks_per_size": args.tasks, "max_steps": args.max_steps,
+              "max_objects": args.max_objects, "sizes": []}
+    os.makedirs(args.out_dir, exist_ok=True)
+    traces = open(os.path.join(args.out_dir, f"llm_{tag}_traces.jsonl"), "w")
     for n in [int(x) for x in args.sizes.split(",")]:
         w = build_world(n)
         store = GraphStore(w.path)
         tasks = make_tasks(store, args.tasks, seed=n)
         entry = {"world_objects": w.n_objects, "conditions": {}}
-        for cond in args.conditions.split(","):
+        for cond in conditions:
             t0 = time.time()
 
             def one(spec):
@@ -81,7 +105,7 @@ def main(argv=None):
                 ctxs = []
                 if cond == "cvm":
                     m = run_cvm(store, spec, proc, w.n_objects, max_steps=args.max_steps,
-                                keep_ctx=ctxs)
+                                max_objects=args.max_objects, keep_ctx=ctxs)
                 else:
                     m = run_agent(store, spec, proc, w.n_objects,
                                   context_limit=args.agent_context_limit,
@@ -113,12 +137,8 @@ def main(argv=None):
                 "invalid_ops_mean": sum(r["invalid_ops"] for r in runs) / len(runs),
                 "aborted": sum(r["aborted"] for r in runs),
                 "abstained": sum(1 for r in runs if r["answer"] in (None, "UNKNOWN")),
-                "accuracy_by_kind": {k: (sum(r["correct"] for r in runs if r["kind"] == k)
-                                         / max(1, sum(1 for r in runs if r["kind"] == k)))
-                                     for k in ("root_cause", "owner", "claim")},
-                "accuracy_by_depth": {d: (sum(r["correct"] for r in runs if r["depth"] == d)
-                                          / max(1, sum(1 for r in runs if r["depth"] == d)))
-                                      for d in (1, 2, 3)},
+                "accuracy_by_kind": accuracy_by(runs, "kind"),
+                "accuracy_by_depth": accuracy_by(runs, "depth"),
                 "wall_seconds": round(time.time() - t0, 1),
             })
             entry["conditions"][cond] = s
@@ -131,7 +151,7 @@ def main(argv=None):
                   f"stepLimit={s['step_limit']} aborted={s['aborted']} overflow={s['context_overflow']} "
                   f"in_tok={s['llm_input_tokens_mean']:.0f} ({s['wall_seconds']}s)", flush=True)
         report["sizes"].append(entry)
-        with open(os.path.join(RESULTS, f"llm_{tag}.json"), "w") as f:
+        with open(os.path.join(args.out_dir, f"llm_{tag}.json"), "w") as f:
             json.dump(report, f, indent=1, default=str)
     traces.close()
 

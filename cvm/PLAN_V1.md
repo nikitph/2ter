@@ -70,14 +70,30 @@ Goal: know how strong untrained models are before training anything.
 3. Use ≥100 tasks per cell if the budget allows (n=30 gives ±0.17 at 95%).
 
 ```bash
-# local vLLM
-python experiments/run_llm.py --provider openai-compatible --base-url http://localhost:8000/v1 \
-   --api-key-env VLLM_KEY --model <served-model-name> --sizes 1000000 --tasks 100 --conditions cvm \
-   --tag base-<model>-ws32
+# local vLLM (or any OpenAI-compatible endpoint)
+for ws in 32 4; do
+  python experiments/run_llm.py --provider openai-compatible --base-url http://localhost:8000/v1 \
+     --api-key-env VLLM_KEY --model <served-model-name> --sizes 1000000 --tasks 100 --conditions cvm \
+     --max-objects $ws --tag base-<model>-ws$ws
+done
 ```
 
-**Code needed:** `run_llm.py` has no `--max-objects` flag yet. Add one and
-pass it through to `run_cvm(..., max_objects=)`. It's a 5-line change.
+**Status:**
+
+- **Done:** the `--max-objects` flag in `run_llm.py`, with tests. It applies to
+  the `cvm` condition only.
+- **Done:** the reference sanity check through the runner. Results are in
+  `RESULTS_V1.md` §M0.
+- **Done:** DeepSeek-V4.1-Flash baseline at 10⁶, 40 tasks per cell:
+  - WS=32: accuracy 0.68;
+  - WS=4: accuracy **0.10**, thrash 0.59, 22 of 40 tasks hit the step limit,
+    about 1 note per task.
+
+  An untrained model collapses under a tight working set because it doesn't
+  keep notes. The reference processor at WS=4 scores 1.00. See
+  `RESULTS_V1.md`.
+- **Pending:** a baseline for the open model that will actually be fine-tuned
+  (M3). It needs a served endpoint (vLLM).
 
 Done when: `results/llm_base-*.json` exist for WS=32 and WS=4.
 
@@ -99,10 +115,12 @@ cells:
 
 ```bash
 for m in <small-model> <7-8b-model>; do
-  for hint in "" "--hint"; do
-    python experiments/run_llm.py --provider openai-compatible --base-url http://localhost:8000/v1 \
-       --api-key-env VLLM_KEY --model $m --sizes 1000000 --tasks 100 --conditions cvm $hint \
-       --tag m0b-$m${hint:+-hint}
+  for ws in 32 4; do
+    for hint in "" "--hint"; do
+      python experiments/run_llm.py --provider openai-compatible --base-url http://localhost:8000/v1 \
+         --api-key-env VLLM_KEY --model $m --sizes 1000000 --tasks 100 --conditions cvm \
+         --max-objects $ws $hint --tag m0b-$m-ws$ws${hint:+-hint}
+    done
   done
 done
 ```
@@ -113,10 +131,25 @@ Reference points:
 - Reference processor (a script with zero intelligence): 1.00.
 
 To make the "above its capability" claim concrete, also run the **same small
-model without CVM**. Use the full-context condition at a world size that fits
-its window (e.g. 10³), or the tool-calling condition (`--conditions agent`) at
-10⁴. The headline result would be: *small model + CVM + method at 10⁶ ≥ the
-same model without CVM at 10³.*
+model without CVM**. The headline result would be: *small model + CVM + method
+at 10⁶ ≥ the same model without CVM at 10³.*
+
+- The tool-calling baseline already works: `--conditions agent` at 10³–10⁴.
+- **The full-context comparison needs new wiring.** `run_llm.py` only supports
+  the `cvm` and `agent` conditions and rejects anything else.
+  `experiment.FullContext` exists, but only the scale experiment uses it, with
+  the reference processor. To run it with an LLM, add a `full` condition to
+  `run_llm.py` that:
+  - builds one `FullContext` per world (it materializes everything and adds
+    the `WORLD: closed` line);
+  - skips sizes whose estimated prompt exceeds the served model's window
+    (`--full-context-limit`), recording them as infeasible like `run_scale.py`
+    does;
+  - allows one step only, since the model answers from the dump.
+
+  At 10³ the prompt is ~77k tokens, so the served model needs at least a 128k
+  window; small models may need 10² instead. Optionally add `rag` the same
+  way via `experiment.run_rag`.
 
 How to read the outcomes:
 
@@ -127,9 +160,13 @@ How to read the outcomes:
 - **Hint barely helps:** the bottleneck is per-step reasoning. Prioritize M6
   (recursion), which breaks hard steps into smaller ones.
 
-**Code needed:** the `--max-objects` flag from M0. `METHOD_HINT` is
-domain-specific (incident debugging). For `domain2`, write the equivalent hint
-for code repos so the comparison is fair.
+**Code needed:**
+
+- the `full` condition above;
+- `--max-objects` (done in M0).
+
+`METHOD_HINT` is domain-specific (incident debugging). For `domain2`, write the
+equivalent hint for code repos so the comparison is fair.
 
 Done when: a table of accuracy, root-cause accuracy, notes per task,
 verifier-rejection rate and capability faults, for each model × cell, is
@@ -210,6 +247,22 @@ Create `experiments/v1_splits.py`, or extend `make_tasks`, with these splits:
 Done when each split has ≥100 tasks and the reference processor scores 1.00
 on all of them. If it doesn't, either the generator or the reference policy
 has a bug; fix it before training.
+
+Implementation notes:
+
+- **`domain2` needs its own reference policy.** `ReferenceReasoner` only
+  handles the incident task kinds (`root_cause` / `owner` / `claim`), and its
+  `_Policy` is written around incident relations: `AFFECTS`, `DEPENDS_ON`,
+  `HAS_METRICS`, `TARGETS`, `ABOUT`. Write a separate `CodeReferenceReasoner`
+  (prompt-only and stateless, same contract) for the code-repo tasks.
+  `make_tasks` and the runner must also dispatch on domain, choosing the world
+  builder, task generator and reference policy.
+- **Its role is validation only.** It proves `domain2` is solvable from the
+  bounded prompt (reference = 1.00). It must **not** feed M1's training data,
+  or `domain2` stops being held-out.
+- **Depth summaries already work for `deep`.** `run_llm.py` used to report
+  accuracy only for depths 1–3. M0 changed it to report whatever depths and
+  task kinds occur in the runs, so 4–5 show up automatically.
 
 ### M3: Fine-tuning
 
@@ -493,10 +546,12 @@ fine-tuning service.
 
 ## 7. Checklist
 
-- [ ] M0: `--max-objects` flag; base model at WS=32 and WS=4 on 10⁶ (n≥100)
-- [ ] M0b: small vs 7–8B model × {plain, hint} × {WS=32, WS=4} at 10⁶, plus same small model without CVM at 10³
+- [x] M0 (code): `--max-objects` flag + tests; data-driven depth/kind summaries; reference sanity at WS=32/4 (1.00 everywhere)
+- [x] M0 (DeepSeek-V4.1-Flash): WS=32 → 0.68, WS=4 → 0.10 (thrash 0.59), n=40 per cell
+- [ ] M0 (fine-tune base model): WS=32 and WS=4 on 10⁶ — needs a served endpoint
+- [ ] M0b: `full` condition in `run_llm.py`; small vs 7–8B model × {plain, hint} × {WS=32, WS=4} at 10⁶, plus same small model without CVM at 10³
 - [ ] M1: `export_trajectories.py` + replay test + `data/v1/{train,val}.jsonl`
-- [ ] M2: `depth_range`, `traps`, `tight`, `domain2` (`synthetic_code_world.py`); reference = 1.00 on all splits
+- [ ] M2: `depth_range`, `traps`, `tight`, `domain2` (`synthetic_code_world.py` + `CodeReferenceReasoner`, validation only); reference = 1.00 on all splits
 - [ ] M3: `v1/train_lora.py`, `v1/requirements.txt`; adapter with ≥95% op accuracy on val
 - [ ] M4: `--split` flag; eval matrix; `RESULTS_V1.md` with charts
 - [ ] M5 (optional): RL refinement if SFT plateaus
