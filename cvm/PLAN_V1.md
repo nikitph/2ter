@@ -490,6 +490,27 @@ models and M6's recursion):
 **Done when:** `RESULTS_V1.md` has the chain-accuracy-vs-depth chart for the
 three arms, plus decoy catch rates and the routing cost/accuracy table.
 
+### M8 (proposed): Programmatic mode
+
+Add an `EXEC` operation for a sandboxed `cvm` API that can batch bounded
+`traverse`, `fault`, and `search` calls. Map recursive `llm_query` calls to
+M6 child contexts with narrower capabilities. Limit execution time, memory,
+returned bytes, tool calls, and recursion depth; all materialized facts still
+enter the immutable ledger with provenance. Compare accuracy, total tokens,
+wall time, and model steps against the one-operation-per-step runtime on the
+same held-out tasks. This is a separate arm, after the M3/M4 baseline.
+
+### M9 (proposed): Editable workspace notes
+
+Let the model replace or edit a bounded workspace document instead of only
+appending key-value notes. Keep runtime facts and citations immutable and
+outside that document. Run a zero-shot DeepSeek comparison at working sets of
+4 and 32 on identical seeded tasks, measuring answer accuracy, re-fetch
+thrash, writes, prompt tokens, steps, and cost. Start with a small sample that
+fits the remaining DeepSeek credit; increase sample size only if the result is
+promising and the budget allows. This experiment can run independently of
+M3 training.
+
 ## 3. Risks and how the plan handles them
 
 | Risk | Mitigation |
@@ -557,3 +578,5 @@ fine-tuning service.
 - [ ] M5 (optional): RL refinement if SFT plateaus
 - [ ] M6 (proposed): `CALL` op for recursive child contexts; small model with/without recursion
 - [ ] M7: `checkers.py` (JevChecker + TrainedCritic), runtime hook, exporter negatives, `--checker`/`--escalate-to`; chain accuracy vs depth, decoy catch rate, routing table
+- [ ] M8 (proposed): sandboxed `EXEC` over the CVM API with batched operations and M6 child calls
+- [ ] M9 (proposed): editable bounded workspace notes, zero-shot DeepSeek WS=4/32 comparison

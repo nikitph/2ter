@@ -153,3 +153,20 @@ for this solvability check. It is never used to create M1 training examples.
 The `full` condition in `run_llm.py` also passed a three-task reference smoke
 test at 10³ objects (one step each), and marked all three tasks infeasible
 when its model-window limit was set below the estimated prompt length.
+
+## M3: A100 training sanity check
+
+On a Runpod A100 SXM4 80 GB in EU-RO-1, the Qwen2.5-7B-Instruct LoRA script
+completed two optimizer steps, saved checkpoints, evaluated held-out prompts,
+and resumed from checkpoint 2 to complete step 4. The first evaluation
+generated valid JSON on 16/16 prompts and chose the right operation on 4/16;
+the resumed evaluation generated valid JSON on 4/4 and chose the right
+operation on 1/4. These tiny, partially trained evaluations check the
+pipeline only; they are not model performance estimates.
+
+The full exported dataset was copied to the persistent volume and all three
+file SHA-256 hashes matched the local files. A 100,000-example training run
+has started with checkpoint saves every two optimizer steps, evaluation every
+ten steps, and a four-hour training time limit. Its progress and final
+metrics will be recorded below when this first budgeted segment ends.
+Machine-readable details: `results/v1_a100_sanity.json`.
