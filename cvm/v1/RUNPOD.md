@@ -35,6 +35,17 @@ If an invocation is interrupted between saves, resume from the last complete
 checkpoint. Keep the volume until training and downstream evaluation are
 finished; deleting the pod alone does not delete the volume.
 
+After a segment exits, check operation selection on a larger validation
+sample before deciding whether to resume training:
+
+```bash
+cd /workspace/2ter/cvm
+HF_HOME=/workspace/hf-cache python3 v1/eval_adapter.py \
+  --adapter-dir /workspace/cvm-v1-full/train/adapter \
+  --val /workspace/cvm-v1-full/data/val.jsonl --examples 256 \
+  --out /workspace/cvm-v1-full/adapter_val_256.json
+```
+
 The first run was started with these options except without
 `--resume-from-checkpoint auto`. It saves every two optimizer steps and
 evaluates every ten. Early action-level accuracy is a diagnostic only; M3's
