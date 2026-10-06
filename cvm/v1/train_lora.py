@@ -21,6 +21,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from cvm.processors import first_json_object, normalize_action  # noqa: E402
 
 DEFAULT_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+CHECKPOINT_FILES = ("trainer_state.json", "optimizer.pt", "scheduler.pt",
+                    "rng_state.pth", "adapter_model.safetensors")
+
+
+def checkpoint_complete(path: Path) -> bool:
+    return path.is_dir() and all((path / name).is_file() for name in CHECKPOINT_FILES)
 
 
 def resolve_checkpoint(output_dir: Path, value: str | None) -> str | None:
@@ -29,13 +35,12 @@ def resolve_checkpoint(output_dir: Path, value: str | None) -> str | None:
         return None
     if value != "auto":
         checkpoint = Path(value)
-        if not (checkpoint / "trainer_state.json").is_file():
+        if not checkpoint_complete(checkpoint):
             raise ValueError(f"incomplete checkpoint: {checkpoint}")
         return str(checkpoint)
     root = output_dir / "checkpoints"
     checkpoints = sorted(
-        (p for p in root.glob("checkpoint-*")
-         if p.is_dir() and (p / "trainer_state.json").is_file()),
+        (p for p in root.glob("checkpoint-*") if checkpoint_complete(p)),
         key=lambda p: int(p.name.rsplit("-", 1)[-1]),
     )
     if not checkpoints:
