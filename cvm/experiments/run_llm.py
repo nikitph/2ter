@@ -28,7 +28,9 @@ from experiments.run_scale import RESULTS, summarize  # noqa: E402
 def make_processor(args):
     if args.provider == "deepseek":
         from cvm.processors import ChatCompletionsProcessor
-        return ChatCompletionsProcessor(model=args.model or "deepseek-chat")
+        from cvm.processors import METHOD_HINT
+        return ChatCompletionsProcessor(model=args.model or "deepseek-chat",
+                                        system_extra=METHOD_HINT if args.hint else "")
     if args.provider == "claude":
         from cvm.processors import ClaudeProcessor
         return ClaudeProcessor(model=args.model or "claude-opus-5-5", effort=args.effort)
@@ -53,11 +55,12 @@ def main(argv=None):
     ap.add_argument("--agent-context-limit", type=int, default=120_000,
                     help="tokens; requests above this are not sent (model window)")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--hint", action="store_true", help="add the investigation-method hint")
     args = ap.parse_args(argv)
     model = args.model or {"deepseek": "deepseek-chat", "claude": "claude-opus-5-5"}.get(
         args.provider, args.provider)
     tag = args.tag or model
-    report = {"provider": args.provider, "model": model, "tasks_per_size": args.tasks,
+    report = {"provider": args.provider, "model": model, "method_hint": args.hint, "tasks_per_size": args.tasks,
               "max_steps": args.max_steps, "sizes": []}
     traces = open(os.path.join(RESULTS, f"llm_{tag}_traces.jsonl"), "w")
     for n in [int(x) for x in args.sizes.split(",")]:
@@ -83,6 +86,8 @@ def main(argv=None):
                 m["llm_calls"] = proc.usage["calls"]
                 m["llm_errors"] = proc.usage.get("errors", 0)
                 c = ctxs[0]
+                print(f"  [{cond}] {spec.task.kind:<10} d={spec.depth} correct={m['correct']} "
+                      f"steps={m['steps']} answer={c.answer}", flush=True)
                 return m, {"world_objects": w.n_objects, "condition": cond,
                            "task": spec.task.text, "expected": spec.expected,
                            "answer": c.answer, "support": c.answer_support,

@@ -485,7 +485,8 @@ class ChatCompletionsProcessor:
     def __init__(self, model: str = "deepseek-chat",
                  base_url: str = "https://api.deepseek.com",
                  api_key_env: str = "DEEPSEEK_API_KEY", transport=None,
-                 temperature: float = 0.0, max_tokens: int = 8192, retries: int = 4):
+                 temperature: float = 0.0, max_tokens: int = 8192, retries: int = 4,
+                 system_extra: str = ""):
         import os
         self.model = model
         self.url = base_url.rstrip("/") + "/chat/completions"
@@ -496,6 +497,7 @@ class ChatCompletionsProcessor:
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.retries = retries
+        self.system = SYSTEM_OPENAI + (("\n\n" + system_extra) if system_extra else "")
         self.usage = {"input_tokens": 0, "output_tokens": 0, "calls": 0, "errors": 0}
 
     def _post(self, body: dict) -> dict:
@@ -511,7 +513,7 @@ class ChatCompletionsProcessor:
         import time
         import urllib.error
         body = {"model": self.model,
-                "messages": [{"role": "system", "content": SYSTEM_OPENAI},
+                "messages": [{"role": "system", "content": self.system},
                              {"role": "user", "content": prompt}],
                 "response_format": {"type": "json_object"},
                 "temperature": self.temperature,
@@ -569,3 +571,18 @@ SYSTEM_OPENAI = SYSTEM.split("Field usage by op")[0] + """Operations and their J
   WRITE     {"op":"WRITE","entries":{key: value}}                persists notes across turns
   ANSWER    {"op":"ANSWER","value":...,"support":["fact:N",...]} value is a ref, SUPPORTED, CONTRADICTED or UNKNOWN
 """ + JSON_FORMAT_NOTE
+
+
+# Optional domain method, used only in the "method-hinted" variant of the LLM
+# experiment to separate "cannot reason" from "does not know the procedure".
+METHOD_HINT = """Investigation method for incidents:
+1. From the incident, note started_at and the AFFECTED service.
+2. TRAVERSE the service's DEPENDS_ON. For each dependency, TRAVERSE HAS_METRICS and
+   FAULT the metrics object: is it anomalous, and when did the anomaly start?
+3. Follow the dependency whose anomaly started EARLIEST and before the current
+   service's onset; repeat from it. Anomalies that start later are effects, not causes.
+4. The root service is the deepest anomalous service with no earlier-anomalous dependency.
+5. SEARCH change:// and deploy:// for the root service ref; FAULT each candidate.
+   The cause is the latest change/deploy TARGETING the root service before ITS anomaly
+   onset. Changes on other services, or after the onset, are not the cause.
+6. WRITE each conclusion (with fact ids) as you go; resident objects may be evicted."""
