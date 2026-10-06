@@ -473,8 +473,17 @@ context's ledger, so the verifier keeps working.
 - Reference processor support: it writes `key = value` lines and parses them back.
 - 6 tests.
 
-**Experiment:** DeepSeek-V4.1-Flash zero-shot at 10⁶ objects, at 4 and 32
-objects, on the same seeded tasks as M0, against M0's NOTES results.
+**Result** (DeepSeek-V4.1-Flash, 10⁶ objects, 4-object working set):
+
+| Memory | Accuracy |
+|---|---:|
+| NOTES (M0) | 0.10 |
+| WORKSPACE | 0.125 |
+| WORKSPACE + method hint | **0.75** |
+
+The mechanism alone does nothing, because the model barely writes. Knowing the
+method, including "record conclusions", is what lifts it, past its own
+32-object, no-method score of 0.68. Details are in `RESULTS_V1.md` §M9.
 
 **Next, if it helps:**
 
@@ -655,7 +664,8 @@ fine-tuning service.
 - [ ] M5 (optional): RL refinement if SFT plateaus
 - [ ] M6 (proposed): `CALL` op for recursive child contexts; small model with/without recursion
 - [x] M9 (code): WORKSPACE memory (`--memory workspace`, REWRITE/APPEND, budget + immutable-fact checks); reference = 1.00 at WS=32/4
-- [ ] M9 (models): DeepSeek zero-shot WORKSPACE vs NOTES at WS=4 and WS=32
+- [x] M9 (models): DeepSeek at WS=4 — WORKSPACE 0.125 vs NOTES 0.10 (no effect alone); WORKSPACE + method hint **0.75** (root cause/owner 16/16)
+- [ ] M9 follow-up: separate the hint's two ingredients (NOTES + hint at WS=4; WORKSPACE + "record conclusions" sentence only); WS=32 cells
 - [ ] M8 (proposed): `EXEC` programmatic mode over a sandboxed `cvm` API (RLM-style); steps/tokens/accuracy vs one-op-per-step
 - [ ] M6 blackboard: shared, capability-scoped, evidence-backed board for child contexts
 - [ ] M7: `checkers.py` (JevChecker + TrainedCritic), runtime hook, exporter negatives, `--checker`/`--escalate-to`; chain accuracy vs depth, decoy catch rate, routing table

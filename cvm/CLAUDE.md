@@ -26,7 +26,16 @@ guess) is planned in `PLAN_V1.md`. M0 is done for DeepSeek-V4.1-Flash
   evicted state is lost.
 - The reference processor scores 1.00 at WS=4.
 
-Teaching the notes habit is V1's clearest target. Still pending: a baseline
+Teaching the notes habit is V1's clearest target.
+
+M9 (a CLM-style WORKSPACE memory, `--memory workspace`) is built. At WS=4:
+
+- WORKSPACE alone: 0.125, no better than notes (0.10).
+- WORKSPACE + method hint: **0.75**, with root cause and owner 16/16, beating
+  the 32-object no-hint baseline of 0.68.
+
+So the method and the habit, not the memory mechanism or the context size,
+drive performance. That is the owner's thesis. Still pending: a baseline
 for the open model chosen for fine-tuning, which needs vLLM.**
 
 - Repo: `nikitph/2ter`. V0 was merged to `master` via
