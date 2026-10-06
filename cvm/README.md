@@ -56,7 +56,8 @@ That makes the scope of the claim precise:
 | Epistemic invariant: unsupported external claims are rejected | **Validated** for the verifier: 9,600/9,600 hallucinated answers rejected, 0 accepted |
 | Capabilities are enforced by the runtime, not by the prompt | **Validated** |
 | Contexts persist across suspend/resume without reconstruction | **Validated** |
-| An *LLM* will reliably obey the fault discipline and reason well inside it | **Open.** A preliminary DeepSeek-V4.1-Flash pilot (below) cited real facts and could not get past capability checks, but chose shortcut evidence and got 0/12 root-cause tasks right. The run was cut short and is not a valid accuracy measurement |
+| An LLM can operate inside the substrate with bounded residency at 10⁶ objects | **Validated, modestly.** DeepSeek-V4.1-Flash scored 0.70 at 10⁶ objects vs 0.53 at 10³ (small n, no detectable drop). Peak residency was ~12 objects and ~2k tokens at both sizes; no unsupported answer was accepted (see "Live LLM results") |
+| An LLM reasons *well* inside it | **Partly.** Root-cause accuracy was 0.40: the model takes the decoy or runs out of steps. The substrate bounds what it sees, not how well it thinks |
 
 ## Synthetic world
 
@@ -291,54 +292,83 @@ DEEPSEEK_API_KEY=... python experiments/run_llm.py --provider deepseek --model d
     --sizes 1000,1000000 --tasks 30 --conditions cvm,agent --workers 8
 ```
 
-## Live LLM pilot: DeepSeek-V4.1-Flash (preliminary, inconclusive)
+## Live LLM results: DeepSeek-V4.1-Flash as the processor
 
-There is one partial live run: 36 CVM tasks on the 10³ world, using the generic
-system prompt with no strategy hints. The API key's credit (free granted
-balance) ran out before a clean run was possible. The traces are in
-`results/llm_deepseek-flash_preliminary_traces.jsonl`.
+Setup: the same runtime, the same 32-object / 16k-token working set and the same
+generic system prompt (no investigation-method hints). Each step is one
+stateless JSON-mode call, temperature 0, at most 50 steps. Results are in
+`results/llm_deepseek-flash_cvm_{1e3,1e6}.json` with full operation traces in
+`*_traces.jsonl`. Budget limited the 10³ run to 15 tasks.
 
-**The numbers are not a valid accuracy measurement.** In the first 30 tasks, a
-parsing bug in my adapter, since fixed, turned about half of all steps into
-invalid operations: DeepSeek appends stray tool-call markup after an otherwise
-valid JSON object. In the next 6 tasks, 4 were cut off by the balance error.
+| | 10³ world (1,015 objects) | 10⁶ world (999,991 objects) |
+|---|---:|---:|
+| tasks | 15 | 30 |
+| **accuracy** | **0.53** | **0.70** |
+| root cause / owner / claim | 0.40 / 1.00 / 0.20 | 0.40 / 0.80 / 0.90 |
+| depth 1 / 2 / 3 | 0.50 / 0.60 / 0.50 | 0.85 / 0.67 / 0.50 |
+| peak resident objects (mean / max) | 11.5 / 18 | 12.3 / 21 |
+| peak prompt tokens (mean / max) | 1,874 / 2,646 | 1,970 / 3,072 |
+| runtime prompt tokens per task | 37.0k | 41.5k |
+| steps per task | 28.2 | 29.9 |
+| faults per task | 16.8 | 17.7 |
+| fault precision / cognitive locality | 0.41 / 0.44 | 0.40 / 0.42 |
+| thrash rate | 0.00 | 0.00 |
+| answers rejected by verifier (unsupported-claim rate) | 0.18 | 0.26 |
+| capability faults per task (retrying denied `claim://`) | 5.4 | 5.4 |
+| WRITEs per task | 1.1 | 0.8 |
+| hit step limit | 1 | 4 |
+| wrong answers: decoy / no answer / other | 2 / 1 / 4 | 3 / 4 / 2 |
+| model tokens per task, input / output (incl. reasoning) | 68k / 53k | 75k / 63k |
+| API cost | ~$0.54 | ~$1.27 |
 
-The traces are still informative about behavior:
+Reference: the deterministic reasoner scores 1.00 at both sizes with ~9.3 peak
+objects and ~1.8k peak tokens.
 
-| Observation | Count |
-|---|---|
-| Accepted answers | 16 (6 correct, all `owner` tasks) |
-| Root-cause tasks answered correctly | 0 of 12 |
-| Wrong root-cause answers that chose the **trap** (a config change on the affected service minutes before the incident) | 4 of 4 |
-| Claim tasks where it marked the trap claim SUPPORTED | 3 |
-| Runs that ever faulted a `metrics://` object, which is needed to find the real anomaly chain | 21 of 36 |
-| Verifier rejections (verdict citing no fact about the claim; the model re-cited and was accepted) | 2 |
-| `CAPABILITY_FAULT`s from retrying denied `claim://` access | 191 |
-| `WRITE`s (notes) across all runs | 13 |
+**What this shows**
 
-What this suggests (tentative):
+1. **Residency was independent of world size with a real LLM in the loop.**
+   Growing the world 1,000× changed peak residency from 11.5 to 12.3 objects and
+   peak prompt from 1.87k to 1.97k tokens. The model never saw more than 3.1k
+   tokens of world state while working in a 10⁶-object address space, a
+   worst-case virtualization ratio of about 48,000 (about 81,000 at mean peak). This part of the thesis
+   holds with an LLM, not just with the reference reasoner.
+2. **Accuracy did not degrade with world size.** It was 0.53 (n=15) vs 0.70
+   (n=30). These samples are small: a 95% interval at n=15 is about ±0.25, so the
+   honest reading is "no detectable drop", not "it got better". Root-cause accuracy
+   was identical at 0.40 at both sizes. In this world, difficulty tracks task
+   depth (0.85 → 0.67 → 0.50 at 10⁶), not world size.
+3. **The model is the bottleneck, not the substrate.** Root cause is the hard
+   task (0.40). The model either takes the decoy (a change on the affected
+   service just before the incident) or runs out of steps exploring. Its
+   fault precision of about 0.4 equals the reference reasoner's (0.36–0.38),
+   so it is not fetching wildly. It is drawing the wrong conclusion or
+   stopping short.
+4. **The verifier did real work.** 18–26% of emitted answers were rejected,
+   almost all claim verdicts that cited no fact about the claim. The model
+   then re-cited and was accepted. No unsupported answer was accepted, but
+   **grounded ≠ correct**: every wrong accepted answer cited real facts.
+5. **Capabilities held, and the model did not learn from them.** It kept probing
+   the denied `claim://` namespace (about 5 faults per task) because the
+   resident view advertises `~ABOUT` links.
+6. **It uses notes far less than the reference reasoner** (about 1 WRITE per task
+   vs about 12). Thrash stayed at 0 only because these tasks fit in 32 objects.
+   With a smaller working set this would fail, as the notes ablation predicts.
 
-1. **The substrate held, but it does not make a weak processor reason well.** The
-   model mostly obeyed "fault, don't guess": it cited real fact ids, and the
-   verifier caught the rest. But it took the temporal-proximity shortcut instead
-   of following anomalies down the dependency graph. That is the spec's
-   `uncertainty → prediction` failure, moved from *asserting* facts to
-   *choosing which facts to fetch*. **Grounding is not correctness:** the verifier
-   accepts a well-cited wrong conclusion.
-2. **The model went looking for side channels.** In the first pilot, before
-   claims were restricted to claim tasks, it went straight from the incident to
-   `~ABOUT` claims that name the true cause and the decoy as candidates. After
-   restriction it kept retrying the denied namespace (191 capability faults)
-   rather than adapting. Runtime-enforced capabilities closed a leak that a
-   prompt rule would not have.
-3. **It barely uses notes.** There were only 13 WRITEs. With a stateless
-   processor that means re-deriving state each step, which is exactly what the
-   working-set ablation shows is fatal once eviction kicks in.
+Cost structure: model input is the resident view re-sent at every step, and
+output is dominated by reasoning tokens. Prompt-prefix caching and batched
+operations are the obvious levers.
 
-Next step when credit is available: re-run with the fixed parser (30 tasks at
-10³ and 10⁶, CVM vs tool calling). A stronger model (`deepseek-v4-pro`, Claude),
-and a variant whose system prompt states the investigation method, would
-separate "can't reason" from "doesn't know the method".
+Not run, for lack of budget: the tool-calling baseline with the LLM at 10⁶
+(prompts of ~100k tokens per step); `deepseek-v4-pro`; the method-hinted prompt
+(`--hint`). The last would separate "cannot reason" from "was not told the
+procedure".
+
+An earlier, discarded pilot (`results/llm_deepseek-flash_preliminary_traces.jsonl`)
+was corrupted by an adapter bug: DeepSeek sometimes appends tool-call markup
+after the JSON object. The adapter now parses the first JSON object. That pilot
+also exposed a side channel: incident → `~ABOUT` → claims naming the
+candidates. It was closed by giving `claim://` capabilities only to
+claim-verification contexts.
 
 ## Known limitations
 
