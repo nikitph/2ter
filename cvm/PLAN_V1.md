@@ -549,7 +549,7 @@ fine-tuning service.
 |---|---|
 | M0 baselines via hosted API (e.g. DeepSeek-Flash, 100 tasks × 2 WS sizes) | ~$8–10 (V0 measured ~$0.04/task) |
 | M1–M2 data generation | $0 (CPU, minutes) |
-| M3 LoRA SFT, 7–8B, ~200M tokens, 1×H100 | a few GPU-hours (tens of dollars on rented GPUs) |
+| M3 LoRA SFT, Qwen2.5-7B, 100k examples, 1×A100 SXM4 80 GB | early 10-step rate projects ~22 GPU-hours, ~$35 at $1.59/hour, plus setup and storage; checkpoint and resume across budgeted segments |
 | M4 eval, self-hosted vLLM | GPU time only |
 | M5 RL (optional) | 5–20× the SFT compute |
 | M7 Jev checker | ~$0.003 per 30-step task (at the reported $0.042 per million input tokens) |
