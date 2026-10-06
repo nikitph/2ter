@@ -32,10 +32,12 @@ def make_processor(args):
         from cvm.processors import METHOD_HINT
         return ChatCompletionsProcessor(model=args.model or "deepseek-chat",
                                         base_url=args.base_url, api_key_env=args.api_key_env,
-                                        system_extra=METHOD_HINT if args.hint else "")
+                                        system_extra=METHOD_HINT if args.hint else "",
+                                        memory=args.memory)
     if args.provider == "claude":
         from cvm.processors import ClaudeProcessor
-        return ClaudeProcessor(model=args.model or "claude-opus-5-5", effort=args.effort)
+        return ClaudeProcessor(model=args.model or "claude-opus-5-5", effort=args.effort,
+                               memory=args.memory)
     if args.provider == "reference":
         from cvm.processors import ReferenceReasoner
         p = ReferenceReasoner()
@@ -66,6 +68,11 @@ def main(argv=None):
     ap.add_argument("--max-objects", type=int, default=32,
                     help="CVM working-set size (resident objects); applies to the cvm condition only")
     ap.add_argument("--out-dir", default=RESULTS, help="where llm_<tag>.json and traces are written")
+    ap.add_argument("--memory", choices=("notes", "workspace"), default="notes",
+                    help="model-written memory: key-value NOTES (V0) or a rewritable WORKSPACE "
+                         "document (M9, CLM-style); cvm condition only")
+    ap.add_argument("--workspace-tokens", type=int, default=1200,
+                    help="token budget of the WORKSPACE document (--memory workspace)")
     ap.add_argument("--agent-context-limit", type=int, default=120_000,
                     help="tokens; requests above this are not sent (model window)")
     ap.add_argument("--tag", default="")
@@ -89,7 +96,9 @@ def main(argv=None):
               "the agent baseline keeps an unbounded transcript", file=sys.stderr)
     report = {"provider": args.provider, "model": model, "method_hint": args.hint,
               "tasks_per_size": args.tasks, "max_steps": args.max_steps,
-              "max_objects": args.max_objects, "sizes": []}
+              "max_objects": args.max_objects, "memory": args.memory,
+              "workspace_tokens": args.workspace_tokens if args.memory == "workspace" else None,
+              "sizes": []}
     os.makedirs(args.out_dir, exist_ok=True)
     traces = open(os.path.join(args.out_dir, f"llm_{tag}_traces.jsonl"), "w")
     for n in [int(x) for x in args.sizes.split(",")]:
@@ -105,7 +114,8 @@ def main(argv=None):
                 ctxs = []
                 if cond == "cvm":
                     m = run_cvm(store, spec, proc, w.n_objects, max_steps=args.max_steps,
-                                max_objects=args.max_objects, keep_ctx=ctxs)
+                                max_objects=args.max_objects, keep_ctx=ctxs,
+                                memory=args.memory, workspace_tokens=args.workspace_tokens)
                 else:
                     m = run_agent(store, spec, proc, w.n_objects,
                                   context_limit=args.agent_context_limit,
@@ -120,7 +130,7 @@ def main(argv=None):
                 return m, {"world_objects": w.n_objects, "condition": cond,
                            "task": spec.task.text, "expected": spec.expected,
                            "answer": c.answer, "support": c.answer_support,
-                           "trace": c.trace, "notes": dict(c.notes)}
+                           "trace": c.trace, "notes": dict(c.notes), "workspace": c.workspace}
 
             with ThreadPoolExecutor(args.workers) as ex:
                 results = list(ex.map(one, tasks))
@@ -137,6 +147,10 @@ def main(argv=None):
                 "invalid_ops_mean": sum(r["invalid_ops"] for r in runs) / len(runs),
                 "aborted": sum(r["aborted"] for r in runs),
                 "abstained": sum(1 for r in runs if r["answer"] in (None, "UNKNOWN")),
+                "workspace_edits_mean": sum(r.get("workspace_edits", 0) for r in runs) / len(runs),
+                "workspace_faults_mean": sum(r.get("workspace_faults", 0) for r in runs) / len(runs),
+                "workspace_tokens_final_mean":
+                    sum(r.get("workspace_tokens_final", 0) for r in runs) / len(runs),
                 "accuracy_by_kind": accuracy_by(runs, "kind"),
                 "accuracy_by_depth": accuracy_by(runs, "depth"),
                 "wall_seconds": round(time.time() - t0, 1),

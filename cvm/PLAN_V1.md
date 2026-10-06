@@ -381,8 +381,106 @@ op.
 
 Start with depth ≤ 2.
 
+**The shared blackboard.** Once a parent has children, the parent's memory
+(NOTES, or the M9 WORKSPACE) becomes a classic **blackboard**: a shared board
+where specialist contexts post findings and the parent reasons over the
+combination (as in Hearsay-II). CVM adds two things classic blackboards
+lacked:
+
+- **Scoped writers.** Each child gets its own board section, or append-only
+  access, through capabilities (e.g. `WRITE scratch://<parent>/metrics/*`),
+  enforced by the runtime rather than by convention.
+- **Evidence on every entry.** A child's posting must cite facts from the
+  *child's* ledger. When posted, those facts are copied into the parent's
+  ledger with provenance pointing at the child context, so the parent's
+  verifier can still check them.
+
+The M7 checker can act as the blackboard's controller: it flags
+contradictory postings and picks which child acts next.
+
+**Code needed for the board:**
+
+- a board namespace and capability scoping per child;
+- fact import with child provenance;
+- a rendering of the board in the parent's view: per-section headers, each
+  under its own budget;
+- tests showing a child can't write outside its section or post an uncited
+  claim.
+
 **Done when:** small-model accuracy with and without `CALL` is reported on
-`iid`, `deep` and `domain2`.
+`iid`, `deep` and `domain2`, including a variant where three specialist
+children (metrics, changes, ownership) post to a shared board.
+
+### M8 (proposed): Programmatic mode, combining CVM with Recursive Language Models
+
+**Idea.** Recursive Language Models (RLM; Zhang, Kraska and Khattab, arXiv
+2512.24601) let a model write code in a REPL over its input and call itself
+recursively (`llm_query`). Combine that with CVM:
+
+- The REPL's data is the **CVM address space**, not a flat string. Code calls
+  a sandboxed `cvm` API: `cvm.traverse(ref, rel)`, `cvm.fault(ref)`,
+  `cvm.search(ns, q)` and `cvm.batch(...)`.
+- `llm_query` becomes M6's `CALL`, so recursive calls inherit capability
+  subsets, bounded views and verified, cited results.
+
+**Why it matters:**
+
+- **It fixes CVM's cost.** Today checking ten dependencies takes ~20
+  single-operation steps, each re-sending a ~2k-token view. One code block
+  can do it.
+- **It gives RLM what it lacks.** RLM's root history grows; CVM bounds it,
+  and adds permissions and provenance.
+
+**Safety rule.** Code runs in a sandbox whose *only* side-channel is the `cvm`
+API. Every call goes through the same capability checks and provenance
+ledger as the instruction set, so code can't read what the context couldn't.
+Results enter the view as facts, as before.
+
+**Code needed:**
+
+- an `EXEC(code)` operation: a restricted Python sandbox exposing only the
+  `cvm` API and `llm_query`→`CALL`, with output truncated into LAST RESULT;
+- per-EXEC limits on API calls, CPU time and output size;
+- a `--programmatic` flag in `run_llm.py`;
+- tests showing EXEC can't bypass capabilities or fabricate facts.
+
+**Measure:** steps, total tokens and accuracy against one operation per step,
+at 10⁶ objects and 32 and 4 objects.
+
+### M9: Workspace memory, combining CVM with Context Language Models
+
+**Idea.** Context Language Models (CLM; Meta, arXiv 2609.37725) let the model
+manage its own context as a file it can rewrite freely. They report gains
+zero-shot. CVM's notes ablation shows model-owned memory is exactly what makes
+a tiny working set work.
+
+M9 replaces the key-value NOTES with a **WORKSPACE**: one document the model
+owns, which it may reorganize, compress or delete freely. The split that keeps
+both properties is:
+
+- **the model owns its reasoning workspace (CLM);**
+- **the runtime owns the world's state and the facts (CVM).**
+
+Facts stay immutable. The workspace may only cite fact ids that exist in the
+context's ledger, so the verifier keeps working.
+
+**Status: built** (see `RESULTS_V1.md` §M9):
+
+- `--memory workspace` and `--workspace-tokens N` (default 1,200).
+- Operations `REWRITE(text)` and `APPEND(text)`.
+- `WORKSPACE_FAULT` when over budget or when citing unknown facts.
+- Workspace-mode system prompt and method hint (`processors.system_for`).
+- Reference processor support: it writes `key = value` lines and parses them back.
+- 6 tests.
+
+**Experiment:** DeepSeek-V4.1-Flash zero-shot at 10⁶ objects, at 4 and 32
+objects, on the same seeded tasks as M0, against M0's NOTES results.
+
+**Next, if it helps:**
+
+- make the WORKSPACE the default memory for live models;
+- use it as the board in M6's blackboard;
+- add WORKSPACE examples (rewrites and compressions) to M1's training data.
 
 ### M7: System-1 step checker (stopping errors from compounding)
 
@@ -556,4 +654,8 @@ fine-tuning service.
 - [ ] M4: `--split` flag; eval matrix; `RESULTS_V1.md` with charts
 - [ ] M5 (optional): RL refinement if SFT plateaus
 - [ ] M6 (proposed): `CALL` op for recursive child contexts; small model with/without recursion
+- [x] M9 (code): WORKSPACE memory (`--memory workspace`, REWRITE/APPEND, budget + immutable-fact checks); reference = 1.00 at WS=32/4
+- [ ] M9 (models): DeepSeek zero-shot WORKSPACE vs NOTES at WS=4 and WS=32
+- [ ] M8 (proposed): `EXEC` programmatic mode over a sandboxed `cvm` API (RLM-style); steps/tokens/accuracy vs one-op-per-step
+- [ ] M6 blackboard: shared, capability-scoped, evidence-backed board for child contexts
 - [ ] M7: `checkers.py` (JevChecker + TrainedCritic), runtime hook, exporter negatives, `--checker`/`--escalate-to`; chain accuracy vs depth, decoy catch rate, routing table

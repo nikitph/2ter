@@ -7,6 +7,7 @@ The model never chooses its context; the runtime creates and schedules them.
 from __future__ import annotations
 
 import itertools
+import re
 from collections import Counter, OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
@@ -54,6 +55,8 @@ class CognitiveContext:
     working_set: WorkingSet
     available_ops: tuple[str, ...] = OPS
     max_notes: int = 48
+    memory: str = "notes"          # "notes" (key-value) | "workspace" (CLM-style document)
+    workspace_tokens: int = 1200   # budget for the workspace document
     trace_window: int | None = 6   # None = keep entire transcript in prompt
     parent: str | None = None
     id: str = ""
@@ -61,6 +64,7 @@ class CognitiveContext:
     # execution state
     state: str = "READY"           # READY | RUNNING | SUSPENDED | DONE
     notes: "OrderedDict[str, str]" = field(default_factory=OrderedDict)
+    workspace: str = ""
     trace: list[str] = field(default_factory=list)
     last_result: str = ""
     answer: Any = None
@@ -112,6 +116,30 @@ class CognitiveContext:
                 return "WRITE_FAULT notes full"
             self.notes[k] = str(v)
         return f"ok ({len(self.notes)}/{self.max_notes} notes)"
+
+    # -- workspace (model-owned document, CLM-style; facts stay immutable) --
+    def write_workspace(self, text: str, mode: str) -> str:
+        """``mode`` is "rewrite" (replace the whole document) or "append".
+
+        The model owns this document and may reorganize, compress or delete
+        anything in it. Two rules keep provenance intact:
+        the document has a token budget, and it may only cite fact ids that
+        exist in this context's ledger (facts themselves are never editable).
+        """
+        text = str(text).strip("\n")
+        new = text if mode == "rewrite" else (
+            f"{self.workspace}\n{text}" if self.workspace else text)
+        toks = approx_tokens(new)
+        if toks > self.workspace_tokens:
+            return (f"WORKSPACE_FAULT over budget ({toks}/{self.workspace_tokens} tokens); "
+                    "REWRITE it shorter")
+        unknown = sorted({f for f in re.findall(r"fact:\d+", new)} - set(self.facts_by_id),
+                         key=lambda f: int(f.split(":")[1]))
+        if unknown:
+            return (f"WORKSPACE_FAULT cites facts never materialized here: {unknown[:5]}; "
+                    "facts are immutable and only come from the runtime")
+        self.workspace = new
+        return f"ok ({toks}/{self.workspace_tokens} tokens)"
 
     def notes_tokens(self) -> int:
         return sum(approx_tokens(f"{k} = {v}") for k, v in self.notes.items())
