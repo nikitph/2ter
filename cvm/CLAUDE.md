@@ -18,9 +18,16 @@ external world while it only ever sees a small, bounded *resident view*:
 The original spec is in `docs/SPEC.md`; user-facing docs are in `README.md`.
 
 **Status: V0 is done and validated. V1 (training a model to fault instead of
-guess) is planned in `PLAN_V1.md`. M0's code slice is done (`--max-objects`,
-reference sanity check at 32/4 objects, all 1.00; see `RESULTS_V1.md`). M0's
-model baselines are pending, because they need a served endpoint.**
+guess) is planned in `PLAN_V1.md`. M0 is done for DeepSeek-V4.1-Flash
+(see `RESULTS_V1.md`):
+
+- WS=32: accuracy 0.68.
+- WS=4: accuracy **0.10**, thrash 0.59. The model writes ~1 note per task, so
+  evicted state is lost.
+- The reference processor scores 1.00 at WS=4.
+
+Teaching the notes habit is V1's clearest target. Still pending: a baseline
+for the open model chosen for fine-tuning, which needs vLLM.**
 
 - Repo: `nikitph/2ter`. V0 was merged to `master` via
   https://github.com/nikitph/2ter/pull/2. Do follow-up work on a new branch
