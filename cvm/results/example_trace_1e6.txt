@@ -1,0 +1,149 @@
+# world: 999,991 objects, 1,855,501 relations
+# task: Determine which change or deployment caused incident://inc-k10611.   expected: deploy://ledger-k10611-cause   depth: 1
+# answer: deploy://ledger-k10611-cause   support: fact:2, fact:5, fact:7, fact:12, fact:8, fact:6, fact:43, fact:47
+# steps: 24   peak resident objects: 8   peak prompt tokens: 1574
+
+## operation trace
+#1 WRITE incident://inc-k10611.facts -> ok (1/48 notes)
+#2 TRAVERSE service://ads-k10611 DEPENDS_ON -> ok 1 refs: service://ledger-k10611 [fact:6]
+#3 WRITE service://ads-k10611.DEPENDS_ON -> ok (2/48 notes)
+#4 TRAVERSE service://ledger-k10611 HAS_METRICS -> ok 1 refs: metrics://ledger-k10611 [fact:7]
+#5 FAULT metrics://ledger-k10611 -> ok metrics://ledger-k10611 resident: 6 facts (fact:8..fact:13)
+#6 WRITE status:service://ledger-k10611 -> ok (3/48 notes)
+#7 TRAVERSE service://ledger-k10611 DEPENDS_ON -> ok 1 refs: service://auth-k10611 [fact:14]
+#8 WRITE service://ledger-k10611.DEPENDS_ON -> ok (4/48 notes)
+#9 TRAVERSE service://auth-k10611 HAS_METRICS -> ok 1 refs: metrics://auth-k10611 [fact:15]
+#10 FAULT metrics://auth-k10611 -> ok metrics://auth-k10611 resident: 6 facts (fact:16..fact:21)
+#11 WRITE status:service://auth-k10611 -> ok (5/48 notes)
+#12 SEARCH change:// 'service://ledger-k10611' -> ok 2 refs: change://ledger-k10611-0, change://ledger-k10611-old
+#13 SEARCH deploy:// 'service://ledger-k10611' -> ok 3 refs: deploy://ledger-k10611-1, deploy://ledger-k10611-cause, deploy://ledger-k10611-mitigation
+#14 WRITE events:service://ledger-k10611 -> ok (6/48 notes)
+#15 FAULT change://ledger-k10611-0 -> ok change://ledger-k10611-0 resident: 8 facts (fact:22..fact:29)
+#16 WRITE event:change://ledger-k10611-0 -> ok (7/48 notes)
+#17 FAULT change://ledger-k10611-old -> ok change://ledger-k10611-old resident: 8 facts (fact:30..fact:37)
+#18 WRITE event:change://ledger-k10611-old -> ok (8/48 notes)
+#19 FAULT deploy://ledger-k10611-1 -> ok deploy://ledger-k10611-1 resident: 5 facts (fact:38..fact:42)
+#20 WRITE event:deploy://ledger-k10611-1 -> ok (9/48 notes)
+#21 FAULT deploy://ledger-k10611-cause -> ok deploy://ledger-k10611-cause resident: 5 facts (fact:43..fact:47)
+#22 WRITE event:deploy://ledger-k10611-cause -> ok (10/48 notes)
+#23 FAULT deploy://ledger-k10611-mitigation -> ok deploy://ledger-k10611-mitigation resident: 5 facts (fact:48..fact:52)
+#24 ANSWER deploy://ledger-k10611-cause -> ACCEPTED
+
+## largest prompt shown to the processor (1574 tokens)
+
+CONTEXT ctx://0001   PRINCIPAL agent://incident-debugger
+TASK task://0 [root_cause]
+  Determine which change or deployment caused incident://inc-k10611.
+
+RESIDENT OBJECTS (8/32 objects, 690/16000 tokens)
+incident://inc-k10611  [incident] elevated errors on ads-k10611
+  [fact:1] severity = SEV1
+  [fact:2] started_at = 2026-03-27T23:49Z
+  [fact:3] status = open
+  [fact:4] symptom = error rate and latency on ads-k10611
+  [fact:5] AFFECTS -> service://ads-k10611
+  (~ABOUT: 2 refs, use TRAVERSE ~ABOUT)
+metrics://ledger-k10611  [metrics] latency for service://ledger-k10611
+  [fact:8] anomaly_start = 2026-03-27T23:37Z
+  [fact:9] baseline = 35
+  [fact:10] metric = latency_p99_ms
+  [fact:11] peak = 875
+  [fact:12] status = anomalous
+  [fact:13] OF -> service://ledger-k10611
+  (~HAS_METRICS: 1 refs, use TRAVERSE ~HAS_METRICS)
+metrics://auth-k10611  [metrics] latency for service://auth-k10611
+  [fact:16] anomaly_start = None
+  [fact:17] baseline = 23
+  [fact:18] metric = latency_p99_ms
+  [fact:19] peak = None
+  [fact:20] status = normal
+  [fact:21] OF -> service://auth-k10611
+  (~HAS_METRICS: 1 refs, use TRAVERSE ~HAS_METRICS)
+change://ledger-k10611-0  [change] config change timeout_ms 3868 -> 3830 on service://ledger-k10611
+  [fact:22] at = 2026-03-27T11:42Z
+  [fact:23] field = timeout_ms
+  [fact:24] new = 3830
+  [fact:25] old = 3868
+  [fact:26] summary = config change timeout_ms 3868 -> 3830 on service://ledger-k10611
+  [fact:27] AUTHORED_BY -> person://u10611-0
+  [fact:28] MODIFIES -> config://ledger-k10611
+  [fact:29] TARGETS -> service://ledger-k10611
+change://ledger-k10611-old  [change] config change cache_ttl_s 578 -> 833 on service://ledger-k10611
+  [fact:30] at = 2026-03-27T02:35Z
+  [fact:31] field = cache_ttl_s
+  [fact:32] new = 833
+  [fact:33] old = 578
+  [fact:34] summary = config change cache_ttl_s 578 -> 833 on service://ledger-k10611
+  [fact:35] AUTHORED_BY -> person://u10611-1
+  [fact:36] MODIFIES -> config://ledger-k10611
+  [fact:37] TARGETS -> service://ledger-k10611
+deploy://ledger-k10611-1  [deploy] deploy v9.22.8 of service://ledger-k10611
+  [fact:38] at = 2026-03-30T10:19Z
+  [fact:39] summary = deploy v9.22.8 of service://ledger-k10611
+  [fact:40] version = v9.22.8
+  [fact:41] AUTHORED_BY -> person://u10611-0
+  [fact:42] TARGETS -> service://ledger-k10611
+deploy://ledger-k10611-cause  [deploy] deploy v8.20.0 of service://ledger-k10611
+  [fact:43] at = 2026-03-27T23:16Z
+  [fact:44] summary = deploy v8.20.0 of service://ledger-k10611
+  [fact:45] version = v8.20.0
+  [fact:46] AUTHORED_BY -> person://u10611-0
+  [fact:47] TARGETS -> service://ledger-k10611
+  (~ABOUT: 1 refs, use TRAVERSE ~ABOUT)
+deploy://ledger-k10611-mitigation  [deploy] deploy v1.32.9 of service://ledger-k10611
+  [fact:48] at = 2026-03-28T00:01Z
+  [fact:49] summary = deploy v1.32.9 of service://ledger-k10611
+  [fact:50] version = v1.32.9
+  [fact:51] AUTHORED_BY -> person://u10611-1
+  [fact:52] TARGETS -> service://ledger-k10611
+
+HANDLES (references discovered by TRAVERSE / SEARCH / EVIDENCE)
+  service://ledger-k10611   (via fact:6 service://ads-k10611 DEPENDS_ON)
+  metrics://ledger-k10611   (via fact:7 service://ledger-k10611 HAS_METRICS)
+  service://auth-k10611   (via fact:14 service://ledger-k10611 DEPENDS_ON)
+  metrics://auth-k10611   (via fact:15 service://auth-k10611 HAS_METRICS)
+  change://ledger-k10611-0   (via SEARCH change:// 'service://ledger-k10611')
+  change://ledger-k10611-old   (via SEARCH change:// 'service://ledger-k10611')
+  deploy://ledger-k10611-1   (via SEARCH deploy:// 'service://ledger-k10611')
+  deploy://ledger-k10611-cause   (via SEARCH deploy:// 'service://ledger-k10611')
+  deploy://ledger-k10611-mitigation   (via SEARCH deploy:// 'service://ledger-k10611')
+
+NOTES (scratch://0001, 10/48)
+  incident://inc-k10611.facts = 2026-03-27T23:49Z service://ads-k10611 | fact:2,fact:5
+  service://ads-k10611.DEPENDS_ON = service://ledger-k10611 | fact:6
+  status:service://ledger-k10611 = anomalous@2026-03-27T23:37Z | fact:7,fact:12,fact:8
+  service://ledger-k10611.DEPENDS_ON = service://auth-k10611 | fact:14
+  status:service://auth-k10611 = normal | fact:15,fact:20
+  events:service://ledger-k10611 = change://ledger-k10611-0,change://ledger-k10611-old,deploy://ledger-k10611-1,deploy://ledger-k10611-cause,deploy://ledger-k10611-mitigation
+  event:change://ledger-k10611-0 = service://ledger-k10611 2026-03-27T11:42Z | fact:22,fact:29
+  event:change://ledger-k10611-old = service://ledger-k10611 2026-03-27T02:35Z | fact:30,fact:37
+  event:deploy://ledger-k10611-1 = service://ledger-k10611 2026-03-30T10:19Z | fact:38,fact:42
+  event:deploy://ledger-k10611-cause = service://ledger-k10611 2026-03-27T23:16Z | fact:43,fact:47
+
+RECENT OPERATIONS
+  #18 WRITE event:change://ledger-k10611-old -> ok (8/48 notes)
+  #19 FAULT deploy://ledger-k10611-1 -> ok deploy://ledger-k10611-1 resident: 5 facts (fact:38..fact:42)
+  #20 WRITE event:deploy://ledger-k10611-1 -> ok (9/48 notes)
+  #21 FAULT deploy://ledger-k10611-cause -> ok deploy://ledger-k10611-cause resident: 5 facts (fact:43..fact:47)
+  #22 WRITE event:deploy://ledger-k10611-cause -> ok (10/48 notes)
+  #23 FAULT deploy://ledger-k10611-mitigation -> ok deploy://ledger-k10611-mitigation resident: 5 facts (fact:48..fact:52)
+
+LAST RESULT
+  ok deploy://ledger-k10611-mitigation resident: 5 facts (fact:48..fact:52)
+
+AVAILABLE OPERATIONS
+  READ(ref, field)                 materialize one field of an object
+  TRAVERSE(ref, relation, page=0)  follow relation (prefix ~ for inverse); returns handles
+  SEARCH(namespace, query)         lexical discovery; returns handles
+  FAULT(ref, field?, reason)       make an object resident
+  EVIDENCE(ref)                    materialize a claim and its evidence links
+  WRITE(entries={key: value})      persist notes in scratch:// (value '' deletes)
+  ANSWER(value, support=[fact ids])
+
+RULES
+  Reason freely over RESIDENT OBJECTS, HANDLES and NOTES.
+  Do not assert external state that is not resident. If you need it, FAULT it.
+  SEARCH discovers references; FAULT/READ materializes state for a known reference.
+  Residency is managed by the runtime: objects may be evicted (LRU). Use WRITE to
+  keep conclusions you will need later, citing their fact ids.
+  ANSWER must cite the fact ids that support it; unsupported answers are rejected.

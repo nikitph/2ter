@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="12">
+<rect width="720" height="360" fill="#fcfcfb"/>
+<text x="72" y="22" font-size="14" font-weight="600" fill="#0b0b0b">Peak prompt size per task vs. world size</text>
+<line x1="72" x2="570" y1="312.0" y2="312.0" stroke="#e4e3df"/>
+<text x="64" y="316.0" text-anchor="end" fill="#52514e">100</text>
+<line x1="72" x2="570" y1="266.7" y2="266.7" stroke="#e4e3df"/>
+<text x="64" y="270.7" text-anchor="end" fill="#52514e">1,000</text>
+<line x1="72" x2="570" y1="221.3" y2="221.3" stroke="#e4e3df"/>
+<text x="64" y="225.3" text-anchor="end" fill="#52514e">10,000</text>
+<line x1="72" x2="570" y1="176.0" y2="176.0" stroke="#e4e3df"/>
+<text x="64" y="180.0" text-anchor="end" fill="#52514e">100,000</text>
+<line x1="72" x2="570" y1="130.7" y2="130.7" stroke="#e4e3df"/>
+<text x="64" y="134.7" text-anchor="end" fill="#52514e">1M</text>
+<line x1="72" x2="570" y1="85.3" y2="85.3" stroke="#e4e3df"/>
+<text x="64" y="89.3" text-anchor="end" fill="#52514e">10M</text>
+<line x1="72" x2="570" y1="40.0" y2="40.0" stroke="#e4e3df"/>
+<text x="64" y="44.0" text-anchor="end" fill="#52514e">100M</text>
+<text x="72.0" y="330" text-anchor="middle" fill="#52514e">10<tspan dy="-5" font-size="9">2</tspan></text>
+<text x="192.7" y="330" text-anchor="middle" fill="#52514e">10<tspan dy="-5" font-size="9">3</tspan></text>
+<text x="317.9" y="330" text-anchor="middle" fill="#52514e">10<tspan dy="-5" font-size="9">4</tspan></text>
+<text x="443.9" y="330" text-anchor="middle" fill="#52514e">10<tspan dy="-5" font-size="9">5</tspan></text>
+<text x="570.0" y="330" text-anchor="middle" fill="#52514e">10<tspan dy="-5" font-size="9">6</tspan></text>
+<text x="321.0" y="352" text-anchor="middle" fill="#52514e">world size (objects in the address space)</text>
+<text transform="translate(16 176.0) rotate(-90)" text-anchor="middle" fill="#52514e">peak prompt tokens (log)</text>
+<line x1="72" x2="570" y1="130.7" y2="130.7" stroke="#52514e" stroke-dasharray="4 4"/>
+<text x="566" y="124.7" text-anchor="end" fill="#52514e">1M-token context window</text>
+<path d="M72.0,259.3 L192.7,254.8 L317.9,253.8 L443.9,253.2 L570.0,253.3" fill="none" stroke="#eda100" stroke-width="2"/>
+<circle cx="72.0" cy="259.3" r="4" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="192.7" cy="254.8" r="4" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="317.9" cy="253.8" r="4" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="443.9" cy="253.2" r="4" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="570.0" cy="253.3" r="4" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
+<path d="M72.0,258.8 L192.7,254.0 L317.9,246.4 L443.9,216.6 L570.0,173.0" fill="none" stroke="#1baf7a" stroke-width="2"/>
+<circle cx="72.0" cy="258.8" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="192.7" cy="254.0" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="317.9" cy="246.4" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="443.9" cy="216.6" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="570.0" cy="173.0" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<path d="M72.0,224.4 L192.7,181.2 L317.9,135.6 L443.9,90.2 L570.0,44.6" fill="none" stroke="#eb6834" stroke-width="2"/>
+<circle cx="72.0" cy="224.4" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="192.7" cy="181.2" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="317.9" cy="135.6" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="443.9" cy="90.2" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="570.0" cy="44.6" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<path d="M72.0,258.1 L192.7,255.9 L317.9,255.9 L443.9,255.2 L570.0,255.2" fill="none" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="72.0" cy="258.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="192.7" cy="255.9" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="317.9" cy="255.9" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="443.9" cy="255.2" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="570.0" cy="255.2" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="580" y="39.6" width="10" height="3" fill="#eb6834"/>
+<text x="594" y="48.6" fill="#0b0b0b">A  full context</text>
+<rect x="580" y="168.0" width="10" height="3" fill="#1baf7a"/>
+<text x="594" y="177.0" fill="#0b0b0b">C  tool calling</text>
+<rect x="580" y="248.3" width="10" height="3" fill="#eda100"/>
+<text x="594" y="257.3" fill="#0b0b0b">B2 graph-RAG</text>
+<rect x="580" y="263.3" width="10" height="3" fill="#2a78d6"/>
+<text x="594" y="272.3" fill="#0b0b0b">D  CVM</text>
+</svg>
