@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="12">
+<rect width="720" height="360" fill="#fcfcfb"/>
+<text x="72" y="22" font-size="14" font-weight="600" fill="#0b0b0b">Task accuracy vs. world size</text>
+<line x1="72" x2="570" y1="312.0" y2="312.0" stroke="#e4e3df"/>
+<text x="64" y="316.0" text-anchor="end" fill="#52514e">0%</text>
+<line x1="72" x2="570" y1="244.0" y2="244.0" stroke="#e4e3df"/>
+<text x="64" y="248.0" text-anchor="end" fill="#52514e">25%</text>
+<line x1="72" x2="570" y1="176.0" y2="176.0" stroke="#e4e3df"/>
+<text x="64" y="180.0" text-anchor="end" fill="#52514e">50%</text>
+<line x1="72" x2="570" y1="108.0" y2="108.0" stroke="#e4e3df"/>
+<text x="64" y="112.0" text-anchor="end" fill="#52514e">75%</text>
+<line x1="72" x2="570" y1="40.0" y2="40.0" stroke="#e4e3df"/>
+<text x="64" y="44.0" text-anchor="end" fill="#52514e">100%</text>
+<text x="72.0" y="330" text-anchor="middle" fill="#52514e">10<tspan dy="-5" font-size="9">2</tspan></text>
+<text x="192.7" y="330" text-anchor="middle" fill="#52514e">10<tspan dy="-5" font-size="9">3</tspan></text>
+<text x="317.9" y="330" text-anchor="middle" fill="#52514e">10<tspan dy="-5" font-size="9">4</tspan></text>
+<text x="443.9" y="330" text-anchor="middle" fill="#52514e">10<tspan dy="-5" font-size="9">5</tspan></text>
+<text x="570.0" y="330" text-anchor="middle" fill="#52514e">10<tspan dy="-5" font-size="9">6</tspan></text>
+<text x="321.0" y="352" text-anchor="middle" fill="#52514e">world size (objects in the address space)</text>
+<text transform="translate(16 176.0) rotate(-90)" text-anchor="middle" fill="#52514e">accuracy</text>
+<path d="M72.0,209.2 L192.7,221.3 L317.9,227.4 L443.9,224.4 L570.0,230.4" fill="none" stroke="#eda100" stroke-width="2"/>
+<circle cx="72.0" cy="209.2" r="4" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="192.7" cy="221.3" r="4" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="317.9" cy="227.4" r="4" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="443.9" cy="224.4" r="4" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="570.0" cy="230.4" r="4" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
+<path d="M72.0,40.0 L192.7,40.0 L317.9,40.0 L443.9,40.0 L570.0,40.0" fill="none" stroke="#1baf7a" stroke-width="2"/>
+<circle cx="72.0" cy="40.0" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="192.7" cy="40.0" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="317.9" cy="40.0" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="443.9" cy="40.0" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="570.0" cy="40.0" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<path d="M72.0,40.0 L192.7,40.0 L317.9,40.0" fill="none" stroke="#eb6834" stroke-width="2"/>
+<circle cx="72.0" cy="40.0" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="192.7" cy="40.0" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="317.9" cy="40.0" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="443.9" cy="312.0" r="4" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<circle cx="570.0" cy="312.0" r="4" fill="#fcfcfb" stroke="#eb6834" stroke-width="2"/>
+<text x="435.9" y="302.0" fill="#52514e">A: prompt exceeds window, not runnable</text>
+<path d="M72.0,40.0 L192.7,40.0 L317.9,40.0 L443.9,40.0 L570.0,40.0" fill="none" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="72.0" cy="40.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="192.7" cy="40.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="317.9" cy="40.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="443.9" cy="40.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="570.0" cy="40.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="580" y="35.0" width="10" height="3" fill="#eb6834"/>
+<text x="594" y="44.0" fill="#0b0b0b">A  full context</text>
+<rect x="580" y="50.0" width="10" height="3" fill="#1baf7a"/>
+<text x="594" y="59.0" fill="#0b0b0b">C  tool calling</text>
+<rect x="580" y="65.0" width="10" height="3" fill="#2a78d6"/>
+<text x="594" y="74.0" fill="#0b0b0b">D  CVM</text>
+<rect x="580" y="225.4" width="10" height="3" fill="#eda100"/>
+<text x="594" y="234.4" fill="#0b0b0b">B2 graph-RAG</text>
+</svg>
