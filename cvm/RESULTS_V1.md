@@ -48,7 +48,7 @@ depth (1–3) in all four cells. Files:
 This is the bar for the model baselines. A model that writes notes the way the
 reference processor does should lose nothing at 4 objects. V0's DeepSeek runs
 averaged about 1 note per task, against about 12 here. That predicts a sharp
-drop at 4 objects, which the M0 model baselines will measure.
+drop at 4 objects; the DeepSeek baseline below confirms it.
 
 ## M0: Model baseline, DeepSeek-V4.1-Flash at 10⁶ objects
 
@@ -108,3 +108,27 @@ seeded tasks. Intervals are 95%. Files:
    spec's description of cognitive thrashing.
 
 Remaining DeepSeek balance after M0: about $2.43.
+
+**Still pending:** the untrained baseline for the open model selected for M3.
+
+## M1: Trajectory exporter
+
+`python3 experiments/export_trajectories.py --tasks 10000 --out data/v1`
+completed locally. It ran 10,000 reference tasks through `CVMRuntime` with
+100% correct answers and no step limits, then wrote 254,147 training and
+50,897 validation examples. The splits use 20 training world seeds (1000–1019)
+and four distinct validation seeds (2000–2003). Both contain world sizes near
+10², 10³ and 10⁴ objects, all three task kinds, depths 1–3, SEARCH enabled and
+disabled, and working sets of 4, 8, 16 and 32 objects. Eviction recovery tasks
+also use a 2-object working set.
+
+The 305,044 examples include 6,427 recovery targets: 625 each after an
+unsupported answer, a denied operation and a useless fault, plus 4,552 after
+an eviction. The exporter deduplicated exact prompt/action pairs (none in this
+run), shuffled each split, and estimated 326 million prompt tokens. All
+exported assistant messages passed `first_json_object` and `normalize_action`
+in a streaming validation. Unit tests replay each recovery trajectory through
+the runtime, check the answer, and verify exported actions and split seeds.
+
+The generated `data/v1/` files are ignored by Git (about 1.9 GB). They can be
+regenerated with the command above. This dataset is ready for model training. The open-model baseline remains pending.
