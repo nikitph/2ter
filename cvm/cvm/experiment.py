@@ -100,6 +100,10 @@ def _metrics(ctx: CognitiveContext, spec: TaskSpec, world_size: int, cond: str,
         "step_limit": ctx.counters["step_limit"],
         "context_overflow": ctx.counters["context_overflow"],
         "invalid_ops": ctx.counters["invalid"],
+        "memory": ctx.memory,
+        "workspace_edits": ctx.counters["workspace_edits"],
+        "workspace_faults": ctx.counters["workspace_faults"],
+        "workspace_tokens_final": approx_tokens(ctx.workspace) if ctx.workspace else 0,
         "aborted": ctx.counters["aborted"],
         "virtualization_ratio": world_size / max(1, peak_obj),
     }
@@ -112,14 +116,17 @@ def _metrics(ctx: CognitiveContext, spec: TaskSpec, world_size: int, cond: str,
 def run_cvm(store, spec: TaskSpec, processor, world_size: int, max_objects=32,
             max_tokens=16_000, prefetch=False, cache: L2Cache | None = None,
             search=True, write=True, cond="D_cvm", max_steps: int = 80,
-            keep_ctx: list | None = None) -> dict:
+            keep_ctx: list | None = None, memory: str = "notes",
+            workspace_tokens: int = 1200) -> dict:
     rt = CVMRuntime(store, RuntimeConfig(prefetch=prefetch, max_steps=max_steps),
                     cache=cache or L2Cache())
-    ops = ("READ", "TRAVERSE", "SEARCH", "FAULT", "EVIDENCE") + (("WRITE",) if write else ())
+    mem_ops = ("WRITE",) if memory == "notes" else ("REWRITE", "APPEND")
+    ops = ("READ", "TRAVERSE", "SEARCH", "FAULT", "EVIDENCE") + (mem_ops if write else ())
     ctx = CognitiveContext("agent://incident-debugger", spec.task,
                            incident_agent_capabilities(search=search, write=write,
                                                        claims=spec.task.kind == "claim"),
-                           WorkingSet(max_objects, max_tokens), available_ops=ops)
+                           WorkingSet(max_objects, max_tokens), available_ops=ops, memory=memory,
+                           workspace_tokens=workspace_tokens)
     io0 = store.io
     rt.run(ctx, processor)
     if keep_ctx is not None:

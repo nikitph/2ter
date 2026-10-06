@@ -63,7 +63,7 @@ def parse_prompt(prompt: str) -> KB:
             section = "objects"; continue
         if line.startswith("HANDLES"):
             section = "handles"; continue
-        if line.startswith("NOTES"):
+        if line.startswith("NOTES") or line.startswith("WORKSPACE"):
             section = "notes"; continue
         if line.startswith("RECENT OPERATIONS"):
             section = "trace"; continue
@@ -95,8 +95,11 @@ def parse_prompt(prompt: str) -> KB:
             if m:
                 kb.handles.append((m.group(1), m.group(2)))
         elif section == "notes":
-            k, _, v = line.strip().partition(" = ")
-            kb.notes[k] = v
+            # NOTES lines and WORKSPACE lines both read as "key = value" when the
+            # writer used that convention; other workspace prose is ignored.
+            k, sep, v = line.strip().partition(" = ")
+            if sep:
+                kb.notes[k] = v
         elif section == "trace":
             kb.trace.append(line.strip())
         elif section == "last":
@@ -129,7 +132,7 @@ class _Policy:
         return val.strip(), [f.strip() for f in fids.split(",") if f.strip()]
 
     def remember(self, key, val, fids):
-        if key not in self.kb.notes and "WRITE" in self.kb.ops:
+        if key not in self.kb.notes and ("WRITE" in self.kb.ops or "APPEND" in self.kb.ops):
             self.writes[key] = f"{val} | {','.join(fids)}" if fids else str(val)
 
     # -- primitive lookups (resident -> notes -> Need) ----------------
@@ -336,7 +339,10 @@ class _Policy:
             value, support = self.solve()
         except Need as n:
             if self.writes:
-                return {"op": "WRITE", "entries": self.writes}
+                if "WRITE" in self.kb.ops:
+                    return {"op": "WRITE", "entries": self.writes}
+                return {"op": "APPEND",
+                        "text": "\n".join(f"{k} = {v}" for k, v in self.writes.items())}
             if n.action["op"] in self.kb.ops:
                 return n.action
             value, support = self.guess()
@@ -395,7 +401,8 @@ ACTION_SCHEMA = {
     "type": "object",
     "properties": {
         "op": {"type": "string",
-               "enum": ["READ", "TRAVERSE", "SEARCH", "FAULT", "EVIDENCE", "WRITE", "ANSWER"]},
+               "enum": ["READ", "TRAVERSE", "SEARCH", "FAULT", "EVIDENCE", "WRITE",
+                        "REWRITE", "APPEND", "ANSWER"]},
         "ref": {"type": "string"},
         "field": {"type": "string"},
         "relation": {"type": "string"},
@@ -409,9 +416,10 @@ ACTION_SCHEMA = {
             "required": ["key", "value"], "additionalProperties": False}},
         "value": {"type": "string"},
         "support": {"type": "array", "items": {"type": "string"}},
+        "text": {"type": "string"},
     },
     "required": ["op", "ref", "field", "relation", "page", "namespace", "query", "reason",
-                 "entries", "value", "support"],
+                 "entries", "value", "support", "text"],
     "additionalProperties": False,
 }
 
@@ -419,20 +427,22 @@ ACTION_SCHEMA = {
 class ClaudeProcessor:
     """One stateless Messages API call per CVM step (requires ANTHROPIC_API_KEY)."""
 
-    def __init__(self, model: str = "claude-opus-5-5", effort: str = "low", client=None):
+    def __init__(self, model: str = "claude-opus-5-5", effort: str = "low", client=None,
+                 memory: str = "notes"):
         if client is None:
             import anthropic
             client = anthropic.Anthropic()
         self.client = client
         self.model = model
         self.effort = effort
+        self.system = system_for(SYSTEM, memory)
         self.usage = {"input_tokens": 0, "output_tokens": 0, "calls": 0}
 
     def step(self, prompt: str) -> dict:
         resp = self.client.messages.create(
             model=self.model,
             max_tokens=4096,
-            system=SYSTEM,
+            system=self.system,
             messages=[{"role": "user", "content": prompt}],
             output_config={"effort": self.effort,
                            "format": {"type": "json_schema", "schema": ACTION_SCHEMA}},
@@ -486,7 +496,7 @@ class ChatCompletionsProcessor:
                  base_url: str = "https://api.deepseek.com",
                  api_key_env: str = "DEEPSEEK_API_KEY", transport=None,
                  temperature: float = 0.0, max_tokens: int = 8192, retries: int = 4,
-                 system_extra: str = ""):
+                 system_extra: str = "", memory: str = "notes"):
         import os
         self.model = model
         base = base_url.rstrip("/")
@@ -500,7 +510,8 @@ class ChatCompletionsProcessor:
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.retries = retries
-        self.system = SYSTEM_OPENAI + (("\n\n" + system_extra) if system_extra else "")
+        self.system = system_for(SYSTEM_OPENAI, memory) + (
+            ("\n\n" + system_for(system_extra, memory)) if system_extra else "")
         self.usage = {"input_tokens": 0, "output_tokens": 0, "calls": 0, "errors": 0}
 
     def _post(self, body: dict) -> dict:
@@ -589,3 +600,38 @@ METHOD_HINT = """Investigation method for incidents:
    The cause is the latest change/deploy TARGETING the root service before ITS anomaly
    onset. Changes on other services, or after the onset, are not the cause.
 6. WRITE each conclusion (with fact ids) as you go; resident objects may be evicted."""
+
+
+# ----------------------------------------------------------------------
+# memory modes
+# ----------------------------------------------------------------------
+_WORKSPACE_EDITS = [
+    ("(resident objects, handles, notes, recent operations)",
+     "(resident objects, handles, your WORKSPACE, recent operations)"),
+    ("so WRITE any conclusion you will need later, with\nthe fact ids that support it.",
+     "so keep everything you will need later in your\nWORKSPACE: a short document "
+     "you own and may REWRITE freely (reorganize,\ncompress, delete), citing [fact:N] "
+     "ids. Facts themselves are immutable and only\ncome from the runtime; the "
+     "WORKSPACE has a token budget."),
+    ("  WRITE     entries: list of {key, value}",
+     "  REWRITE   text: the complete new WORKSPACE\n  APPEND    text: lines to add to the WORKSPACE"),
+    ('  WRITE     {"op":"WRITE","entries":{key: value}}                persists notes across turns',
+     '  REWRITE   {"op":"REWRITE","text":"..."}                       replaces your whole WORKSPACE\n'
+     '  APPEND    {"op":"APPEND","text":"..."}                        adds lines to your WORKSPACE'),
+    ('  {"op": "WRITE", "entries": {"status:service://x": "anomalous@2026-03-01T10:00Z | fact:7,fact:9"}}',
+     '  {"op": "APPEND", "text": "service://x anomalous from 2026-03-01T10:00Z (fact:7, fact:9)"}'),
+    ("6. WRITE each conclusion (with fact ids) as you go; resident objects may be evicted.",
+     "6. Record each conclusion (with fact ids) in your WORKSPACE as you go; resident\n"
+     "   objects may be evicted. REWRITE it to stay compact."),
+]
+
+
+def system_for(text: str, memory: str) -> str:
+    """Adapt a system prompt or method hint to the context's memory mode."""
+    if memory == "notes" or not text:
+        return text
+    if memory != "workspace":
+        raise ValueError(f"unknown memory mode {memory!r}")
+    for old, new in _WORKSPACE_EDITS:
+        text = text.replace(old, new)
+    return text

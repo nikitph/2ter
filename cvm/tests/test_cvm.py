@@ -325,5 +325,82 @@ class RunLLMTests(unittest.TestCase):
             run_llm.main(["--provider", "reference", "--max-objects", "0"])
 
 
+class WorkspaceMemoryTests(unittest.TestCase):
+    """M9: a model-owned WORKSPACE document instead of key-value notes."""
+
+    def _ctx(self, caps=None, budget=1200):
+        rt = CVMRuntime(STORE)
+        ctx = CognitiveContext("agent://ws", TASKS[0].task, caps or incident_agent_capabilities(),
+                               WorkingSet(4), available_ops=("READ", "TRAVERSE", "SEARCH", "FAULT",
+                                                             "EVIDENCE", "REWRITE", "APPEND"),
+                               memory="workspace", workspace_tokens=budget)
+        rt.seed(ctx)
+        return rt, ctx
+
+    def test_append_rewrite_and_prompt(self):
+        rt, ctx = self._ctx()
+        rt.dispatch(ctx, {"op": "APPEND", "text": "incident start 14:32 (fact:1)"})
+        rt.dispatch(ctx, {"op": "APPEND", "text": "next: check deps"})
+        self.assertEqual(ctx.workspace, "incident start 14:32 (fact:1)\nnext: check deps")
+        rt.dispatch(ctx, {"op": "REWRITE", "text": "summary: start 14:32 (fact:1)"})
+        self.assertEqual(ctx.workspace, "summary: start 14:32 (fact:1)")
+        prompt = rt.build_prompt(ctx)
+        self.assertIn("WORKSPACE (scratch://", prompt)
+        self.assertIn("  summary: start 14:32 (fact:1)", prompt)
+        self.assertIn("REWRITE(text)", prompt)
+        self.assertNotIn("NOTES (", prompt)
+        self.assertNotIn("  WRITE(", prompt)
+
+    def test_budget_and_immutable_facts(self):
+        rt, ctx = self._ctx(budget=20)
+        rt.dispatch(ctx, {"op": "APPEND", "text": "x" * 200})
+        self.assertTrue(ctx.last_result.startswith("WORKSPACE_FAULT over budget"))
+        self.assertEqual(ctx.workspace, "")
+        rt, ctx = self._ctx()
+        rt.dispatch(ctx, {"op": "REWRITE", "text": "cause is change://x (fact:9999)"})
+        self.assertTrue(ctx.last_result.startswith("WORKSPACE_FAULT cites facts never"))
+        self.assertEqual(ctx.workspace, "")
+        self.assertEqual(ctx.counters["workspace_faults"], 1)
+
+    def test_capability_and_mode_checks(self):
+        caps = [c for c in incident_agent_capabilities() if "WRITE" not in c.operations]
+        rt, ctx = self._ctx(caps=caps)
+        rt.dispatch(ctx, {"op": "APPEND", "text": "hi"})
+        self.assertTrue(ctx.last_result.startswith("CAPABILITY_FAULT"))
+        rt2 = CVMRuntime(STORE)
+        nctx = CognitiveContext("n", TASKS[0].task, incident_agent_capabilities(), WorkingSet(),
+                                available_ops=("APPEND",))
+        rt2.dispatch(nctx, {"op": "APPEND", "text": "hi"})
+        self.assertIn("uses NOTES", nctx.last_result)
+
+    def test_reference_solves_through_workspace_at_ws4(self):
+        for sp in TASKS[:9]:
+            m = run_cvm(STORE, sp, ReferenceReasoner(), WORLD.n_objects, max_objects=4,
+                        memory="workspace")
+            self.assertEqual(m["correct"], 1, sp.task.text)
+            self.assertLessEqual(m["peak_resident_objects"], 4)
+            self.assertGreater(m["workspace_edits"], 0)
+            self.assertEqual(m["workspace_faults"], 0)
+
+    def test_system_prompt_swap(self):
+        from cvm.processors import ChatCompletionsProcessor, METHOD_HINT
+        p = ChatCompletionsProcessor(transport=lambda b: None, memory="workspace",
+                                     system_extra=METHOD_HINT)
+        stripped = p.system.replace("REWRITE", "")
+        self.assertNotIn("WRITE", stripped)
+        self.assertIn("APPEND", p.system)
+        n = ChatCompletionsProcessor(transport=lambda b: None)
+        self.assertIn('"op":"WRITE"', n.system)
+        self.assertEqual(normalize_action({"op": "rewrite", "text": "a"}),
+                         {"op": "REWRITE", "text": "a"})
+
+    def test_runner_memory_flag(self):
+        rep = RunLLMTests._run(self, "--memory", "workspace", "--max-objects", "4")
+        self.assertEqual(rep["memory"], "workspace")
+        c = rep["sizes"][0]["conditions"]["cvm"]
+        self.assertEqual(c["accuracy"], 1.0)
+        self.assertGreater(c["workspace_edits_mean"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

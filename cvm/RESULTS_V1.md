@@ -108,3 +108,83 @@ seeded tasks. Intervals are 95%. Files:
    spec's description of cognitive thrashing.
 
 Remaining DeepSeek balance after M0: about $2.43.
+
+## M9: Workspace memory (CLM-style), zero-shot
+
+**What changed.** `--memory workspace` replaces key-value NOTES with a
+WORKSPACE: one document the model owns and edits with `REWRITE(text)` and
+`APPEND(text)`. Two rules apply:
+
+- it has a 1,200-token budget;
+- it may only cite fact ids that exist in the context's ledger, because facts
+  themselves are immutable.
+
+The reference processor scores 1.00 in workspace mode at 32 and 4 objects
+(40 tasks each, 10⁶ objects, ~12 edits and ~270 tokens of workspace per task,
+no faults). Files: `results/llm_m9-reference-ws{32,4}.json`.
+
+**DeepSeek-V4.1-Flash at 10⁶ objects, 4-object working set:**
+
+| | Notes (M0) | Workspace | **Workspace + method hint** |
+|---|---:|---:|---:|
+| Tasks | 40 | 40 (same tasks as M0) | 24 |
+| **Accuracy** | 0.10 ± 0.09 | 0.125 ± 0.10 | **0.75** ± 0.17 |
+| Root cause / owner / claim | 0.00 / 0.31 / 0.00 | 0.00 / 0.31 / 0.08 | **1.00 / 1.00** / 0.25 |
+| Memory writes per task | 0.95 | 1.1 | 2.9 |
+| Workspace size at end (tokens) | — | 136 | 176 |
+| Thrash rate | 0.59 | 0.54 | 0.39 |
+| Hit 50-step limit | 22 / 40 | 26 / 40 | 6 / 24 |
+| Answers rejected by verifier | 0% | 12% | 0% |
+| Capability faults per task | 5.3 | 6.0 | **0.0** |
+| Wrong answers: no answer / decoy / other | 22 / 8 / 6 | 26 / 2 / 7 | 6 / 0 / 0 |
+| Model tokens per task, input / output | 72k / 35k | 79k / 45k | 77k / 22k |
+| Cost | $1.03 | $1.31 | $0.46 |
+
+Files: `results/llm_m9-deepseek-flash-ws4{,-hint}.json` and `_traces.jsonl`.
+
+**Reading.**
+
+1. **A better memory mechanism alone does nothing.** Workspace vs notes on
+   the same 40 tasks was 0.125 vs 0.10. In the paired comparison 2 tasks were
+   solved only with the workspace and 1 only with notes, which is noise.
+   CLM's zero-shot gains don't transfer here because the model barely uses
+   the memory it's given (~1 edit per task). When it does write, the content is
+   good: structured findings with fact ids, an explicit "gap", and a
+   "next step".
+2. **Knowing the method changes everything.** The hint adds two things:
+   - the investigation procedure (follow the earliest anomaly down the
+     dependency chain, then take the latest change on the root service before
+     its onset);
+   - "record each conclusion in your WORKSPACE".
+
+   With it, accuracy at 4 objects goes from about 0.1 to **0.75**. Root-cause
+   and owner tasks are **all correct** (16 of 16), with zero decoy answers and
+   zero capability faults. Every one of the 6 failures is a claim task that ran
+   out of steps. The hint describes the root-cause procedure, not how to turn
+   it into a verdict on a claim.
+3. **With 4 objects and the method, the model beats itself with 32 objects
+   and no method:** 0.75 against 0.68 in M0, though with overlapping
+   intervals. Its view was about 1.4k tokens. It's the clearest evidence yet
+   for the owner's premise: **instruction processing, not context, drives
+   performance.** The same model, with less context but the right method,
+   does better.
+4. **The two hint ingredients aren't separated yet.** The hint contains both
+   the procedure and the instruction to write things down, so this run can't
+   say how much each contributes. The low thrash (0.39) and fewer steps
+   suggest both matter.
+
+   The cheapest way to separate them:
+   - notes + hint at 4 objects;
+   - workspace with *only* the "record conclusions" sentence.
+
+   That costs about $1–2 with DeepSeek; the remaining balance (~$0.56) isn't
+   enough.
+
+**What it means for V1.** This is M0b's question answered early for a
+mid-size model: **the method lifts the model a lot, with no training.** V1's
+fine-tuning (M1–M3) is trying to put exactly this method, plus the
+memory-keeping habit, into the weights, so the gain no longer depends on a
+hand-written, domain-specific hint. The `domain2` split then tests whether a
+trained model carries the habit to a domain with no hint at all.
+
+Remaining DeepSeek balance after M9: about $0.56.

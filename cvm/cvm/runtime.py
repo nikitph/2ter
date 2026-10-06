@@ -29,6 +29,16 @@ RULES = """RULES
   keep conclusions you will need later, citing their fact ids.
   ANSWER must cite the fact ids that support it; unsupported answers are rejected."""
 
+RULES_WORKSPACE = """RULES
+  Reason freely over RESIDENT OBJECTS, HANDLES and your WORKSPACE.
+  Do not assert external state that is not resident. If you need it, FAULT it.
+  SEARCH discovers references; FAULT/READ materializes state for a known reference.
+  Residency is managed by the runtime: objects may be evicted (LRU). Your WORKSPACE
+  is the only memory that survives between steps and evictions. It is yours: keep
+  in it whatever you will need, cite fact ids, and REWRITE it freely to stay
+  within budget. Facts themselves are immutable; cite only ids you have seen.
+  ANSWER must cite the fact ids that support it; unsupported answers are rejected."""
+
 OP_DOCS = {
     "READ": "READ(ref, field)                 materialize one field of an object",
     "TRAVERSE": "TRAVERSE(ref, relation, page=0)  follow relation (prefix ~ for inverse); returns handles",
@@ -36,6 +46,8 @@ OP_DOCS = {
     "FAULT": "FAULT(ref, field?, reason)       make an object resident",
     "EVIDENCE": "EVIDENCE(ref)                    materialize a claim and its evidence links",
     "WRITE": "WRITE(entries={key: value}, ref?)  persist notes in scratch:// (value '' deletes)",
+    "REWRITE": "REWRITE(text)                    replace your whole WORKSPACE (reorganize, compress, delete)",
+    "APPEND": "APPEND(text)                     add lines to the end of your WORKSPACE",
     "ANSWER": "ANSWER(value, support=[fact ids])",
 }
 
@@ -82,17 +94,26 @@ class CVMRuntime:
             "HANDLES (references discovered by TRAVERSE / SEARCH / EVIDENCE)",
             ws.render_handles() or "  (none)",
             "",
-            f"NOTES (scratch://{ctx.id[6:]}, {len(ctx.notes)}/{ctx.max_notes})",
-            "\n".join(f"  {k} = {v}" for k, v in ctx.notes.items()) or "  (none)",
-            "",
-            "RECENT OPERATIONS",
         ]
+        if ctx.memory == "workspace":
+            parts += [
+                f"WORKSPACE (scratch://{ctx.id[6:]}, "
+                f"{approx_tokens(ctx.workspace) if ctx.workspace else 0}/{ctx.workspace_tokens} "
+                "tokens; yours to rewrite)",
+                "\n".join(f"  {ln}" for ln in ctx.workspace.splitlines()) or "  (empty)",
+            ]
+        else:
+            parts += [
+                f"NOTES (scratch://{ctx.id[6:]}, {len(ctx.notes)}/{ctx.max_notes})",
+                "\n".join(f"  {k} = {v}" for k, v in ctx.notes.items()) or "  (none)",
+            ]
+        parts += ["", "RECENT OPERATIONS"]
         trace = ctx.trace if ctx.trace_window is None else ctx.trace[-ctx.trace_window:]
         parts.append("\n".join(f"  {t}" for t in trace) or "  (none)")
         parts += ["", "LAST RESULT", f"  {ctx.last_result or '(none)'}", "",
                   "AVAILABLE OPERATIONS"]
         parts += [f"  {OP_DOCS[o]}" for o in ctx.available_ops + ("ANSWER",)]
-        parts += ["", RULES]
+        parts += ["", RULES_WORKSPACE if ctx.memory == "workspace" else RULES]
         return "\n".join(parts)
 
     # ------------------------------------------------------------------
@@ -186,6 +207,8 @@ class CVMRuntime:
             return f"EVIDENCE {a.get('ref')}"
         if op == "WRITE":
             return f"WRITE {', '.join(a.get('entries', {}))}"
+        if op in ("REWRITE", "APPEND"):
+            return f"{op} ({len(str(a.get('text', '')))} chars)"
         if op == "ANSWER":
             return f"ANSWER {a.get('value')}"
         return op
@@ -306,6 +329,25 @@ class CVMRuntime:
         if not target.startswith("scratch://"):
             return f"READ_ONLY_MOUNT {namespace_of(target)} (V0 resolvers do not accept writes)"
         return ctx.write_notes(dict(a["entries"]))
+
+    def _workspace_op(self, ctx, a, mode):
+        ctx.counters["writes"] += 1
+        ctx.counters["workspace_edits"] += 1
+        target = f"scratch://{ctx.id[6:]}"
+        if not ctx.can("WRITE", target):
+            return self._capability_fault(ctx, "WRITE", target)
+        if ctx.memory != "workspace":
+            return "INVALID_OPERATION this context uses NOTES; use WRITE"
+        result = ctx.write_workspace(a["text"], mode)
+        if result.startswith("WORKSPACE_FAULT"):
+            ctx.counters["workspace_faults"] += 1
+        return result
+
+    def _op_rewrite(self, ctx, a):
+        return self._workspace_op(ctx, a, "rewrite")
+
+    def _op_append(self, ctx, a):
+        return self._workspace_op(ctx, a, "append")
 
     def _op_answer(self, ctx, a):
         value = a.get("value")
