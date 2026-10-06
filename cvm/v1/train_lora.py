@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -20,6 +21,26 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from cvm.processors import first_json_object, normalize_action  # noqa: E402
 
 DEFAULT_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+
+
+def resolve_checkpoint(output_dir: Path, value: str | None) -> str | None:
+    """Resolve an explicit checkpoint or the newest complete Trainer checkpoint."""
+    if value is None:
+        return None
+    if value != "auto":
+        checkpoint = Path(value)
+        if not (checkpoint / "trainer_state.json").is_file():
+            raise ValueError(f"incomplete checkpoint: {checkpoint}")
+        return str(checkpoint)
+    root = output_dir / "checkpoints"
+    checkpoints = sorted(
+        (p for p in root.glob("checkpoint-*")
+         if p.is_dir() and (p / "trainer_state.json").is_file()),
+        key=lambda p: int(p.name.rsplit("-", 1)[-1]),
+    )
+    if not checkpoints:
+        raise ValueError(f"no complete checkpoint to resume in {root}")
+    return str(checkpoints[-1])
 
 
 def load_examples(path: Path, limit: int = 0) -> tuple[list[dict], set[int]]:
@@ -98,6 +119,12 @@ def main(argv=None):
     ap.add_argument("--batch-size", type=int, default=1)
     ap.add_argument("--grad-accum", type=int, default=64)
     ap.add_argument("--eval-steps", type=int, default=100)
+    ap.add_argument("--save-steps", type=int, default=0,
+                    help="checkpoint interval; 0 uses --eval-steps")
+    ap.add_argument("--resume-from-checkpoint", default=None,
+                    help="checkpoint path or 'auto' for latest complete checkpoint")
+    ap.add_argument("--time-limit-minutes", type=float, default=0,
+                    help="finish the current optimizer step, save, and exit after this long")
     ap.add_argument("--max-length", type=int, default=4096)
     ap.add_argument("--learning-rate", type=float, default=1.5e-4)
     ap.add_argument("--lora-r", type=int, default=32)
@@ -106,6 +133,11 @@ def main(argv=None):
     if min(args.batch_size, args.grad_accum, args.eval_steps, args.max_length,
            args.lora_r) < 1 or args.train_examples < 0 or args.val_examples < 0:
         ap.error("batch, accumulation, evaluation, length and LoRA rank must be positive")
+    if args.save_steps < 0:
+        ap.error("save-steps must be nonnegative")
+    if args.time_limit_minutes < 0:
+        ap.error("time-limit-minutes must be nonnegative")
+    save_steps = args.save_steps or args.eval_steps
     train_rows, train_seeds = load_examples(args.train, args.train_examples)
     val_rows, val_seeds = load_examples(args.val, args.val_examples)
     if not train_seeds.isdisjoint(val_seeds):
@@ -117,10 +149,12 @@ def main(argv=None):
     if args.dry_run:
         return preflight
 
+    resume_checkpoint = resolve_checkpoint(args.output_dir, args.resume_from_checkpoint)
+
     import torch
     from datasets import Dataset
     from peft import LoraConfig
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoModelForCausalLM, AutoTokenizer, TrainerCallback
     from trl import SFTConfig, SFTTrainer
 
     if not torch.cuda.is_available():
@@ -132,6 +166,7 @@ def main(argv=None):
                                                 attn_implementation="sdpa")
     model.config.use_cache = False
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    load_best = save_steps % args.eval_steps == 0
     config = SFTConfig(
         output_dir=str(args.output_dir / "checkpoints"),
         max_length=args.max_length,
@@ -149,9 +184,9 @@ def main(argv=None):
         eval_strategy="steps",
         eval_steps=args.eval_steps,
         save_strategy="steps",
-        save_steps=args.eval_steps,
-        save_total_limit=2,
-        load_best_model_at_end=True,
+        save_steps=save_steps,
+        save_total_limit=3,
+        load_best_model_at_end=load_best,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         logging_steps=1,
@@ -161,17 +196,36 @@ def main(argv=None):
     lora = LoraConfig(r=args.lora_r, lora_alpha=2 * args.lora_r,
                       lora_dropout=0.05, target_modules="all-linear",
                       bias="none", task_type="CAUSAL_LM")
+    class TimeLimitCallback(TrainerCallback):
+        def __init__(self, minutes: float):
+            self.deadline = time.monotonic() + minutes * 60
+
+        def on_step_end(self, args, state, control, **kwargs):
+            if time.monotonic() >= self.deadline:
+                control.should_save = True
+                control.should_training_stop = True
+                print(f"TIME_LIMIT_CHECKPOINT step={state.global_step}", flush=True)
+            return control
+
+    callbacks = ([TimeLimitCallback(args.time_limit_minutes)]
+                 if args.time_limit_minutes else [])
     trainer = SFTTrainer(model=model, args=config,
                          train_dataset=Dataset.from_list(train_rows),
                          eval_dataset=Dataset.from_list(val_rows),
-                         peft_config=lora, processing_class=tokenizer)
-    trainer.train()
+                         peft_config=lora, processing_class=tokenizer,
+                         callbacks=callbacks)
+    trainer.train(resume_from_checkpoint=resume_checkpoint)
     adapter_dir = args.output_dir / "adapter"
     trainer.model.save_pretrained(adapter_dir)
     tokenizer.save_pretrained(adapter_dir)
     metrics = evaluate_actions(trainer.model, tokenizer, val_rows,
                                args.eval_generation_examples, args.max_length)
     metrics.update(preflight)
+    metrics["resumed_from_checkpoint"] = resume_checkpoint
+    metrics["global_step"] = trainer.state.global_step
+    metrics["max_steps"] = trainer.state.max_steps
+    metrics["time_limit_minutes"] = args.time_limit_minutes
+    metrics["best_model_checkpoint"] = trainer.state.best_model_checkpoint
     (args.output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
     print("TRAIN_DONE", json.dumps(metrics), flush=True)
     return metrics
