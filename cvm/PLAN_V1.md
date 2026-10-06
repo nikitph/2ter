@@ -331,6 +331,112 @@ Start with depth ≤ 2.
 **Done when:** small-model accuracy with and without `CALL` is reported on
 `iid`, `deep` and `domain2`.
 
+### M7: System-1 step checker (stopping errors from compounding)
+
+**Problem.** Long chains of steps, and especially M6's recursive calls,
+compound errors. If each step is wrong with probability ε, a chain of n steps
+succeeds with about (1−ε)ⁿ. With ε = 0.1 and n = 20, that's about 12%.
+
+**Fix.** Add a fast, cheap checker after every step. If it catches a fraction
+d of errors and triggers a correction, the per-step error drops to about
+ε(1−d). The chain then succeeds with about (1−ε(1−d))ⁿ, about 82% for d = 0.9
+in the same example.
+
+The checker doesn't need to be smart. It needs to be fast and cheap, and
+**wrong in different ways than the generator**.
+
+CVM's verifier already does the *structural* check: are the cited facts real?
+The checker adds a *semantic* check: does this step make sense given the
+state?
+
+**Where it plugs in.** A new runtime hook, `RuntimeConfig.checker`. After each
+step, and after each child `CALL` in M6, the runtime sends the checker:
+
+- the resident view;
+- the operation the model just issued;
+- the result.
+
+It gets back typed decisions with probabilities:
+
+| Question | Type | Use |
+|---|---|---|
+| Is this step on a productive path for the task? | yes/no probability | low → feed back a hint, or retry the step |
+| Does this result contradict a conclusion in NOTES? | yes/no probability | high → force a re-check of that conclusion |
+| How confident should we be in this ANSWER, given the cited facts? | score | below threshold → reject and continue instead of accepting |
+| What next? `accept / retry / reroute / escalate / decompose` | choice | `escalate` = re-run this step on a bigger model; `decompose` = issue a `CALL` (M6) |
+
+The probabilities are the "delta": the size of the surprise. A threshold on
+them decides what to do. Keep every intervention visible in the trace so
+runs stay auditable.
+
+**Two arms, run in parallel:**
+
+1. **Jev (TypeSafe's System One model), off the shelf.** It takes unstructured
+   state plus typed questions and returns calibrated probabilities in one
+   parallel pass. It has three answer types:
+   - Choice: one of N;
+   - Score: a number;
+   - Noul: a yes/no probability.
+
+   It doesn't generate text, so it can't return malformed values. Reported
+   latency is 70–500 ms, at $0.042 per million input tokens with output free.
+   At ~2k tokens per check that's about $0.0001 per step, or ~$0.003 per
+   30-step task, against ~$0.04 per task for DeepSeek-Flash in V0.
+
+   Implement as `JevChecker` in `cvm/checkers.py`, reading the key from an env
+   var. Check TypeSafe's docs for the current API; a community Claude Code
+   integration exists (`FrancoisChastel/jev-code` on GitHub). Jev is in early
+   access, so the owner needs a key. In a Claude Code cloud session, its API
+   host must also be added to the network allowlist.
+
+2. **Our own critic, trained on CVM's ground truth.** Its training signal comes
+   from ground-truth outcomes, not from imitating the generator, so its blind
+   spots shouldn't line up with the generator's.
+   - Extend M1's exporter to also emit **labelled negative steps**:
+     - off-path faults;
+     - decoy fetches (e.g. faulting the trap change);
+     - premature or wrong answers;
+     - retries of denied operations;
+     - missing notes before eviction.
+
+     Labels come for free, because the synthetic worlds know the correct path.
+   - Train either a small classifier (a ≤1B encoder, or a LoRA head on the M3
+     base model) or a JEPA-style predictor. A JEPA-style predictor predicts the
+     embedding of the expected result and scores the prediction error.
+   - Implement as `TrainedCritic` in `cvm/checkers.py`, behind the same
+     interface as `JevChecker`.
+
+**What to measure** (on M2's held-out splits, in combination with M0b's small
+models and M6's recursion):
+
+- **catch rate d**: errors flagged ÷ errors made. Report it **separately for
+  decoy steps**. A general-purpose checker may find the decoy as plausible as
+  the generator does; this is the number that decides whether the idea works;
+- **false-alarm rate**: correct steps flagged. These cost extra steps;
+- **calibration**: predicted probability vs actual step correctness
+  (reliability diagram);
+- **chain accuracy vs. depth / steps**, with no checker, with Jev and with the
+  trained critic. The target is a curve that stays flat as depth grows;
+- **cost and latency overhead** per task;
+- **routing**: a small model by default, escalating only flagged steps to a
+  bigger model. Measure accuracy and cost against using the big model for
+  everything. This is the most direct test of "small models perform far above
+  their size".
+
+**Code needed:**
+
+- `cvm/checkers.py` with a `Checker` protocol:
+  `check(prompt, action, result) -> {probabilities..., decision}`;
+- the runtime hook, with configurable thresholds and actions;
+- an `escalate` path that re-runs one step on a second processor;
+- exporter negatives (M1);
+- `--checker {none,jev,critic}` and `--escalate-to <model>` flags in
+  `run_llm.py`;
+- tests with a fake checker covering every decision path.
+
+**Done when:** `RESULTS_V1.md` has the chain-accuracy-vs-depth chart for the
+three arms, plus decoy catch rates and the routing cost/accuracy table.
+
 ## 3. Risks and how the plan handles them
 
 | Risk | Mitigation |
@@ -372,6 +478,8 @@ fine-tuning service.
 | M3 LoRA SFT, 7–8B, ~200M tokens, 1×H100 | a few GPU-hours (tens of dollars on rented GPUs) |
 | M4 eval, self-hosted vLLM | GPU time only |
 | M5 RL (optional) | 5–20× the SFT compute |
+| M7 Jev checker | ~$0.003 per 30-step task (at the reported $0.042 per million input tokens) |
+| M7 trained critic | small: hours on one GPU, or less for a ≤1B classifier |
 
 ## 6. Decisions the owner needs to make
 
@@ -381,6 +489,7 @@ fine-tuning service.
 3. **Second domain (`domain2`):** strongly recommended. It is what makes the
    result more than "the model imitated a script".
 4. **Budget cap** for API baselines in M0.
+5. **Jev access** for M7: a TypeSafe early-access API key.
 
 ## 7. Checklist
 
@@ -392,3 +501,4 @@ fine-tuning service.
 - [ ] M4: `--split` flag; eval matrix; `RESULTS_V1.md` with charts
 - [ ] M5 (optional): RL refinement if SFT plateaus
 - [ ] M6 (proposed): `CALL` op for recursive child contexts; small model with/without recursion
+- [ ] M7: `checkers.py` (JevChecker + TrainedCritic), runtime hook, exporter negatives, `--checker`/`--escalate-to`; chain accuracy vs depth, decoy catch rate, routing table

@@ -190,7 +190,10 @@ Other flags: `--hint` adds `METHOD_HINT` to the system prompt;
    (the owner's main interest: can CVM plus the method make small models
    perform far above their size?) → M1 exporter → M2 splits (incl. second
    domain) → M3 LoRA → M4 eval → M6 recursive `CALL` contexts (the owner's
-   idea: hard reasoning steps become recursive bounded calls).
+   idea: hard reasoning steps become recursive bounded calls) → M7 system-1
+   step checker against compounding errors: TypeSafe's **Jev** (a System One
+   typed classifier; the owner's suggestion) off the shelf, plus our own
+   critic, possibly JEPA-style, trained on CVM ground-truth negatives.
 2. **`ClaudeProcessor` has never been run live.** It uses `output_config`
    JSON-schema structured output and is tested only against a mock. The first
    live run may need fixes; check `stop_reason` handling and the schema's
