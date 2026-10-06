@@ -80,8 +80,14 @@ def evaluate_actions(model, tokenizer, rows: list[dict], limit: int,
     model.eval()
     device = next(model.parameters()).device
     results = {"examples": 0, "json_valid": 0, "op_correct": 0,
-               "action_exact": 0}
+               "action_exact": 0, "by_expected_op": {}}
     for row in rows[:limit or None]:
+        expected = first_json_object(row["completion"][0]["content"])
+        op = expected["op"]
+        bucket = results["by_expected_op"].setdefault(
+            op, {"examples": 0, "json_valid": 0, "op_correct": 0,
+                 "action_exact": 0})
+        bucket["examples"] += 1
         prompt = tokenizer.apply_chat_template(row["prompt"], tokenize=False,
                                                add_generation_prompt=True)
         inputs = tokenizer(prompt, return_tensors="pt", truncation=True,
@@ -92,19 +98,24 @@ def evaluate_actions(model, tokenizer, rows: list[dict], limit: int,
         generated = tokenizer.decode(output[0][inputs["input_ids"].shape[1]:],
                                      skip_special_tokens=True)
         predicted = first_json_object(generated)
-        expected = first_json_object(row["completion"][0]["content"])
         results["examples"] += 1
         if predicted is None:
             continue
         results["json_valid"] += 1
+        bucket["json_valid"] += 1
         predicted = normalize_action(predicted)
         if predicted.get("op") == expected.get("op"):
             results["op_correct"] += 1
+            bucket["op_correct"] += 1
         if predicted == expected:
             results["action_exact"] += 1
+            bucket["action_exact"] += 1
     n = results["examples"]
     for key in ("json_valid", "op_correct", "action_exact"):
         results[key + "_rate"] = results[key] / n if n else 0.0
+    for bucket in results["by_expected_op"].values():
+        for key in ("json_valid", "op_correct", "action_exact"):
+            bucket[key + "_rate"] = bucket[key] / bucket["examples"]
     return results
 
 
