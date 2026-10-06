@@ -251,5 +251,31 @@ class ChatCompletionsAdapterTests(unittest.TestCase):
         self.assertEqual(ctx.counters["steps"], 1)
 
 
+class CustomStoreExampleTests(unittest.TestCase):
+    def test_custom_store_end_to_end(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
+        import custom_store as cs
+        from cvm.resolver import L2Cache, MountTable, NamespaceMount, Resolver
+        store = cs.DictStore(cs.demo_world())
+        cache = L2Cache()
+        g = Resolver(store, cache)
+        ns = ("repo://", "file://", "commit://", "team://", "bug://")
+        rt = CVMRuntime(store, cache=cache, mounts=MountTable([NamespaceMount(n, g) for n in ns]))
+        caps = [Capability(n + "*", ("READ", "TRAVERSE", "FAULT")) for n in ns]
+        caps.append(Capability("commit://*", ("SEARCH",)))
+        ctx = CognitiveContext("a", Task("t", "x", "q", "bug://771", ["bug://771"]), caps,
+                               WorkingSet(4))
+        rt.seed(ctx)
+        rt.dispatch(ctx, {"op": "SEARCH", "namespace": "commit://", "query": "tax rounding"})
+        rt.dispatch(ctx, {"op": "FAULT", "ref": "commit://a8f92d", "reason": "r"})
+        ids = [f.id for f in ctx.facts_by_id.values() if f.ref == "commit://a8f92d"]
+        rt.dispatch(ctx, {"op": "ANSWER", "value": "commit://a8f92d", "support": ids[:1]})
+        self.assertEqual(ctx.answer, "commit://a8f92d")
+        rt2 = CVMRuntime(store, cache=cache, mounts=MountTable([NamespaceMount(n, g) for n in ns]))
+        ctx2 = CognitiveContext("b", Task("t", "x", "q", "bug://771", []), caps, WorkingSet(4))
+        rt2.dispatch(ctx2, {"op": "SEARCH", "namespace": "team://", "query": "payments"})
+        self.assertTrue(ctx2.last_result.startswith("CAPABILITY_FAULT"))
+
+
 if __name__ == "__main__":
     unittest.main()

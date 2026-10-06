@@ -489,7 +489,10 @@ class ChatCompletionsProcessor:
                  system_extra: str = ""):
         import os
         self.model = model
-        self.url = base_url.rstrip("/") + "/chat/completions"
+        base = base_url.rstrip("/")
+        self.url = base + ("/chat/completions" if base.endswith("/v1") or "deepseek" in base
+                           else "/v1/chat/completions" if "localhost" in base or "127.0.0.1" in base
+                           else "/chat/completions")
         self.key = os.environ.get(api_key_env, "") if transport is None else "test"
         if not self.key:
             raise RuntimeError(f"{api_key_env} is not set")

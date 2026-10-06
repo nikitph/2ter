@@ -26,10 +26,11 @@ from experiments.run_scale import RESULTS, summarize  # noqa: E402
 
 
 def make_processor(args):
-    if args.provider == "deepseek":
+    if args.provider in ("deepseek", "openai-compatible"):
         from cvm.processors import ChatCompletionsProcessor
         from cvm.processors import METHOD_HINT
         return ChatCompletionsProcessor(model=args.model or "deepseek-chat",
+                                        base_url=args.base_url, api_key_env=args.api_key_env,
                                         system_extra=METHOD_HINT if args.hint else "")
     if args.provider == "claude":
         from cvm.processors import ClaudeProcessor
@@ -56,6 +57,10 @@ def main(argv=None):
                     help="tokens; requests above this are not sent (model window)")
     ap.add_argument("--tag", default="")
     ap.add_argument("--hint", action="store_true", help="add the investigation-method hint")
+    ap.add_argument("--base-url", default="https://api.deepseek.com",
+                    help="OpenAI-compatible endpoint, e.g. http://localhost:8000/v1 for vLLM")
+    ap.add_argument("--api-key-env", default="DEEPSEEK_API_KEY",
+                    help="name of the env var holding the API key (any non-empty value for local vLLM)")
     args = ap.parse_args(argv)
     model = args.model or {"deepseek": "deepseek-chat", "claude": "claude-opus-5-5"}.get(
         args.provider, args.provider)
