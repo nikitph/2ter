@@ -151,10 +151,17 @@ class CVMRuntime:
     def dispatch(self, ctx: CognitiveContext, a: dict) -> None:
         op = str(a.get("op", "")).upper()
         n = ctx.counters["steps"]
+        if op == "ABORT":  # processor cannot continue (e.g. request rejected by the model API)
+            ctx.counters["aborted"] += 1
+            ctx.state = "DONE"
+            ctx.last_result = f"ABORTED {a.get('error', '')}"
+            ctx.trace.append(f"#{n} ABORT {a.get('error', '')[:120]}")
+            return
         if op != "ANSWER" and op not in ctx.available_ops:
-            ctx.last_result = f"INVALID_OPERATION {op or a}"
+            why = a.get("error") or f"unknown op {op or a}"
+            ctx.last_result = f"INVALID_OPERATION {why}"[:300]
             ctx.counters["invalid"] += 1
-            ctx.trace.append(f"#{n} {op} -> INVALID_OPERATION")
+            ctx.trace.append(f"#{n} {op or '?'} -> INVALID_OPERATION {why}"[:200])
             return
         handler = getattr(self, f"_op_{op.lower()}")
         try:

@@ -214,5 +214,42 @@ class ClaudeAdapterTests(unittest.TestCase):
         self.assertEqual(a["support"], ["fact:3"])
 
 
+class ChatCompletionsAdapterTests(unittest.TestCase):
+    def test_json_mode_stateless_and_abort(self):
+        import json
+        from cvm.processors import ChatCompletionsProcessor
+        sp = TASKS[1]
+        bodies = []
+        script = [
+            {"op": "fault", "ref": sp.task.target, "reason": "need incident"},
+            {"op": "ANSWER", "value": sp.task.target, "support": ["[fact:1]"]},
+        ]
+
+        def transport(body):
+            bodies.append(body)
+            return {"choices": [{"message": {"content": json.dumps(script.pop(0))}}],
+                    "usage": {"prompt_tokens": 100, "completion_tokens": 7}}
+
+        proc = ChatCompletionsProcessor(transport=transport)
+        rt = CVMRuntime(STORE)
+        ctx = CognitiveContext("agent://ds", sp.task, incident_agent_capabilities(), WorkingSet())
+        rt.run(ctx, proc, max_steps=5)
+        self.assertEqual(ctx.state, "DONE")
+        self.assertEqual(ctx.answer, sp.task.target)
+        self.assertEqual(proc.usage["calls"], 2)
+        for b in bodies:
+            self.assertEqual(b["response_format"], {"type": "json_object"})
+            self.assertEqual([m["role"] for m in b["messages"]], ["system", "user"])
+
+        def broken(body):
+            import urllib.error
+            raise urllib.error.HTTPError("u", 401, "unauthorized", {}, None)
+
+        ctx = CognitiveContext("agent://ds", sp.task, incident_agent_capabilities(), WorkingSet())
+        rt.run(ctx, ChatCompletionsProcessor(transport=broken), max_steps=5)
+        self.assertEqual(ctx.counters["aborted"], 1)
+        self.assertEqual(ctx.counters["steps"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

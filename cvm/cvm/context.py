@@ -136,7 +136,8 @@ class CognitiveContext:
         return all(self.can(op, probe if probe != "*" else "x://") for op in cap.operations)
 
 
-def incident_agent_capabilities(search: bool = True, write: bool = True) -> list[Capability]:
+def incident_agent_capabilities(search: bool = True, write: bool = True,
+                                claims: bool = True) -> list[Capability]:
     caps = [
         Capability("service://*", ("READ", "TRAVERSE", "FAULT")),
         Capability("host://*", ("READ", "TRAVERSE", "FAULT")),
@@ -147,8 +148,9 @@ def incident_agent_capabilities(search: bool = True, write: bool = True) -> list
         Capability("incident://*", ("READ", "TRAVERSE", "FAULT")),
         Capability("change://*", ("READ", "TRAVERSE", "FAULT")),
         Capability("deploy://*", ("READ", "TRAVERSE", "FAULT")),
-        Capability("claim://*", ("READ", "TRAVERSE", "FAULT", "EVIDENCE")),
     ]
+    if claims:  # hypotheses about an incident are only visible to claim-verification tasks
+        caps.append(Capability("claim://*", ("READ", "TRAVERSE", "FAULT", "EVIDENCE")))
     if search:
         caps += [Capability("change://*", ("SEARCH",)), Capability("deploy://*", ("SEARCH",))]
     if write:

@@ -99,6 +99,8 @@ def _metrics(ctx: CognitiveContext, spec: TaskSpec, world_size: int, cond: str,
         "evictions": ctx.working_set.evictions,
         "step_limit": ctx.counters["step_limit"],
         "context_overflow": ctx.counters["context_overflow"],
+        "invalid_ops": ctx.counters["invalid"],
+        "aborted": ctx.counters["aborted"],
         "virtualization_ratio": world_size / max(1, peak_obj),
     }
     if extra:
@@ -109,27 +111,38 @@ def _metrics(ctx: CognitiveContext, spec: TaskSpec, world_size: int, cond: str,
 # ----------------------------------------------------------------------
 def run_cvm(store, spec: TaskSpec, processor, world_size: int, max_objects=32,
             max_tokens=16_000, prefetch=False, cache: L2Cache | None = None,
-            search=True, write=True, cond="D_cvm") -> dict:
-    rt = CVMRuntime(store, RuntimeConfig(prefetch=prefetch), cache=cache or L2Cache())
+            search=True, write=True, cond="D_cvm", max_steps: int = 80,
+            keep_ctx: list | None = None) -> dict:
+    rt = CVMRuntime(store, RuntimeConfig(prefetch=prefetch, max_steps=max_steps),
+                    cache=cache or L2Cache())
     ops = ("READ", "TRAVERSE", "SEARCH", "FAULT", "EVIDENCE") + (("WRITE",) if write else ())
     ctx = CognitiveContext("agent://incident-debugger", spec.task,
-                           incident_agent_capabilities(search=search, write=write),
+                           incident_agent_capabilities(search=search, write=write,
+                                                       claims=spec.task.kind == "claim"),
                            WorkingSet(max_objects, max_tokens), available_ops=ops)
     io0 = store.io
     rt.run(ctx, processor)
+    if keep_ctx is not None:
+        keep_ctx.append(ctx)
     return _metrics(ctx, spec, world_size, cond, store.io - io0)
 
 
-def run_agent(store, spec: TaskSpec, processor, world_size: int) -> dict:
-    rt = CVMRuntime(store, RuntimeConfig(agent_mode=True, context_limit=CONTEXT_LIMIT),
+def run_agent(store, spec: TaskSpec, processor, world_size: int,
+              context_limit: int = CONTEXT_LIMIT, max_steps: int = 80,
+              keep_ctx: list | None = None) -> dict:
+    rt = CVMRuntime(store, RuntimeConfig(agent_mode=True, context_limit=context_limit,
+                                         max_steps=max_steps),
                     cache=L2Cache())
     ctx = CognitiveContext("agent://tool-caller", spec.task,
-                           incident_agent_capabilities(write=False),
+                           incident_agent_capabilities(write=False,
+                                                       claims=spec.task.kind == "claim"),
                            WorkingSet(INF, INF, max_handles=INF, full_render=True),
                            available_ops=("READ", "TRAVERSE", "SEARCH", "FAULT", "EVIDENCE"),
                            trace_window=None)
     io0 = store.io
     rt.run(ctx, processor)
+    if keep_ctx is not None:
+        keep_ctx.append(ctx)
     return _metrics(ctx, spec, world_size, "C_agent", store.io - io0)
 
 

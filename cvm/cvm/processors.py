@@ -451,8 +451,121 @@ def normalize_action(a: dict) -> dict:
     out = {k: v for k, v in a.items() if v not in ("", [], {}, None)}
     out["op"] = a.get("op", "")
     if isinstance(a.get("entries"), list):
-        out["entries"] = {e["key"]: e["value"] for e in a["entries"]}
+        out["entries"] = {e["key"]: e["value"] for e in a["entries"]
+                          if isinstance(e, dict) and "key" in e}
+    if isinstance(out.get("op"), str):
+        out["op"] = out["op"].upper()
     if out["op"] == "ANSWER":
         out.setdefault("support", [])
-        out["support"] = [s.strip("[]") for s in out["support"]]
+        out["support"] = [str(s).strip("[] ") for s in out["support"]]
+        if out.get("value") is not None:
+            out["value"] = str(out["value"]).strip()
     return out
+
+
+# ----------------------------------------------------------------------
+# OpenAI-compatible chat endpoints (DeepSeek and similar)
+# ----------------------------------------------------------------------
+JSON_FORMAT_NOTE = """
+Respond with a single JSON object, for example:
+  {"op": "FAULT", "ref": "metrics://x", "reason": "need latency onset"}
+  {"op": "TRAVERSE", "ref": "service://x", "relation": "DEPENDS_ON"}
+  {"op": "SEARCH", "namespace": "change://", "query": "service://x"}
+  {"op": "WRITE", "entries": {"status:service://x": "anomalous@2026-03-01T10:00Z | fact:7,fact:9"}}
+  {"op": "ANSWER", "value": "change://y", "support": ["fact:3", "fact:12"]}"""
+
+
+class ChatCompletionsProcessor:
+    """One stateless chat-completions call per CVM step (JSON mode).
+
+    Works with any OpenAI-compatible endpoint; defaults target DeepSeek. The API
+    key is read from the environment and never stored elsewhere.
+    """
+
+    def __init__(self, model: str = "deepseek-chat",
+                 base_url: str = "https://api.deepseek.com",
+                 api_key_env: str = "DEEPSEEK_API_KEY", transport=None,
+                 temperature: float = 0.0, max_tokens: int = 8192, retries: int = 4):
+        import os
+        self.model = model
+        self.url = base_url.rstrip("/") + "/chat/completions"
+        self.key = os.environ.get(api_key_env, "") if transport is None else "test"
+        if not self.key:
+            raise RuntimeError(f"{api_key_env} is not set")
+        self.transport = transport or self._post
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.retries = retries
+        self.usage = {"input_tokens": 0, "output_tokens": 0, "calls": 0, "errors": 0}
+
+    def _post(self, body: dict) -> dict:
+        import urllib.request
+        req = urllib.request.Request(
+            self.url, data=json.dumps(body).encode(), method="POST",
+            headers={"Authorization": f"Bearer {self.key}",
+                     "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=180) as r:
+            return json.loads(r.read())
+
+    def step(self, prompt: str) -> dict:
+        import time
+        import urllib.error
+        body = {"model": self.model,
+                "messages": [{"role": "system", "content": SYSTEM_OPENAI},
+                             {"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"},
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens}
+        for attempt in range(self.retries + 1):
+            try:
+                resp = self.transport(body)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code in (429, 500, 502, 503, 504) and attempt < self.retries:
+                    time.sleep(2 ** attempt)
+                    continue
+                self.usage["errors"] += 1
+                detail = e.read()[:300].decode(errors="replace") if hasattr(e, "read") else ""
+                return {"op": "ABORT", "error": f"HTTP {e.code} {detail}"}
+            except (urllib.error.URLError, TimeoutError) as e:
+                if attempt < self.retries:
+                    time.sleep(2 ** attempt)
+                    continue
+                self.usage["errors"] += 1
+                return {"op": "ABORT", "error": f"transport: {e}"}
+        self.usage["calls"] += 1
+        u = resp.get("usage") or {}
+        self.usage["input_tokens"] += u.get("prompt_tokens", 0)
+        self.usage["output_tokens"] += u.get("completion_tokens", 0)
+        text = resp["choices"][0]["message"].get("content") or ""
+        a = first_json_object(text)
+        if a is None:
+            self.usage["parse_errors"] = self.usage.get("parse_errors", 0) + 1
+            return {"op": "INVALID", "error": f"no JSON object in output: {text[:80]!r}"}
+        return normalize_action(a)
+
+
+def first_json_object(text: str):
+    """Parse the first JSON object in ``text``; models sometimes append stray tokens."""
+    dec = json.JSONDecoder()
+    i = text.find("{")
+    while i != -1:
+        try:
+            obj, _ = dec.raw_decode(text, i)
+            if isinstance(obj, dict):
+                return obj
+        except json.JSONDecodeError:
+            pass
+        i = text.find("{", i + 1)
+    return None
+
+
+SYSTEM_OPENAI = SYSTEM.split("Field usage by op")[0] + """Operations and their JSON fields:
+  READ      {"op":"READ","ref":...,"field":...}
+  TRAVERSE  {"op":"TRAVERSE","ref":...,"relation":...,"page":0}   relation e.g. DEPENDS_ON, HAS_METRICS; prefix ~ for inverse (e.g. ~TARGETS)
+  SEARCH    {"op":"SEARCH","namespace":"change://","query":...}
+  FAULT     {"op":"FAULT","ref":...,"reason":...}                 makes the object resident
+  EVIDENCE  {"op":"EVIDENCE","ref":"claim://..."}
+  WRITE     {"op":"WRITE","entries":{key: value}}                persists notes across turns
+  ANSWER    {"op":"ANSWER","value":...,"support":["fact:N",...]} value is a ref, SUPPORTED, CONTRADICTED or UNKNOWN
+""" + JSON_FORMAT_NOTE

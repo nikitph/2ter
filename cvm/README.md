@@ -23,7 +23,7 @@ cvm/
   processors.py       ReferenceReasoner, Hallucinator, ClaudeProcessor
   experiment.py       conditions A/B/C/D + metrics
 experiments/          run_scale.py, run_ablations.py, show_trace.py, plot.py
-tests/                18 unit/integration tests
+tests/                19 unit/integration tests
 results/              scale.json, ablations.json, SVG charts, example trace at 1e6
 ```
 
@@ -31,7 +31,7 @@ Standard library only; Python 3.10 or later. `anthropic` is needed only for `Cla
 
 ```bash
 cd cvm
-python -m unittest tests.test_cvm          # 18 tests, ~1 s
+python -m unittest tests.test_cvm          # 19 tests, ~1 s
 python experiments/run_scale.py            # 1e2..1e6 objects; ~2 min (worlds cached in .cache/)
 python experiments/run_ablations.py        # at 1e6 objects; ~20 s
 python experiments/show_trace.py           # one annotated run at 1e6
@@ -56,7 +56,7 @@ That makes the scope of the claim precise:
 | Epistemic invariant: unsupported external claims are rejected | **Validated** for the verifier: 9,600/9,600 hallucinated answers rejected, 0 accepted |
 | Capabilities are enforced by the runtime, not by the prompt | **Validated** |
 | Contexts persist across suspend/resume without reconstruction | **Validated** |
-| An *LLM* will reliably obey the fault discipline (fault instead of guessing, write notes, cite facts) | **Not tested here.** `ClaudeProcessor` implements the same contract (one stateless Messages API call per step, JSON-schema structured output). Run it with an API key (see below) |
+| An *LLM* will reliably obey the fault discipline and reason well inside it | **Open.** A preliminary DeepSeek-V4.1-Flash pilot (below) cited real facts and could not get past capability checks, but chose shortcut evidence and got 0/12 root-cause tasks right. The run was cut short and is not a valid accuracy measurement |
 
 ## Synthetic world
 
@@ -278,6 +278,67 @@ the reference reasoner's 1.00. Those are the numbers V0 cannot answer without a
 model. This adapter has been tested only against a mocked client: it makes stateless
 single-turn calls, uses the structured-output schema, and has its fabricated
 citations rejected. It has not been run against the live API.
+
+### DeepSeek or any OpenAI-compatible endpoint
+
+`ChatCompletionsProcessor` makes one stateless JSON-mode chat-completions call
+per step and reads the key from `DEEPSEEK_API_KEY`. `experiments/run_llm.py`
+runs tasks in parallel. It writes summaries to `results/llm_<model>.json` and
+every run's operation trace to `results/llm_<model>_traces.jsonl`:
+
+```bash
+DEEPSEEK_API_KEY=... python experiments/run_llm.py --provider deepseek --model deepseek-flash \
+    --sizes 1000,1000000 --tasks 30 --conditions cvm,agent --workers 8
+```
+
+## Live LLM pilot: DeepSeek-V4.1-Flash (preliminary, inconclusive)
+
+There is one partial live run: 36 CVM tasks on the 10³ world, using the generic
+system prompt with no strategy hints. The API key's credit (free granted
+balance) ran out before a clean run was possible. The traces are in
+`results/llm_deepseek-flash_preliminary_traces.jsonl`.
+
+**The numbers are not a valid accuracy measurement.** In the first 30 tasks, a
+parsing bug in my adapter, since fixed, turned about half of all steps into
+invalid operations: DeepSeek appends stray tool-call markup after an otherwise
+valid JSON object. In the next 6 tasks, 4 were cut off by the balance error.
+
+The traces are still informative about behavior:
+
+| Observation | Count |
+|---|---|
+| Accepted answers | 16 (6 correct, all `owner` tasks) |
+| Root-cause tasks answered correctly | 0 of 12 |
+| Wrong root-cause answers that chose the **trap** (a config change on the affected service minutes before the incident) | 4 of 4 |
+| Claim tasks where it marked the trap claim SUPPORTED | 3 |
+| Runs that ever faulted a `metrics://` object, which is needed to find the real anomaly chain | 21 of 36 |
+| Verifier rejections (verdict citing no fact about the claim; the model re-cited and was accepted) | 2 |
+| `CAPABILITY_FAULT`s from retrying denied `claim://` access | 191 |
+| `WRITE`s (notes) across all runs | 13 |
+
+What this suggests (tentative):
+
+1. **The substrate held, but it does not make a weak processor reason well.** The
+   model mostly obeyed "fault, don't guess": it cited real fact ids, and the
+   verifier caught the rest. But it took the temporal-proximity shortcut instead
+   of following anomalies down the dependency graph. That is the spec's
+   `uncertainty → prediction` failure, moved from *asserting* facts to
+   *choosing which facts to fetch*. **Grounding is not correctness:** the verifier
+   accepts a well-cited wrong conclusion.
+2. **The model went looking for side channels.** In the first pilot, before
+   claims were restricted to claim tasks, it went straight from the incident to
+   `~ABOUT` claims that name the true cause and the decoy as candidates. After
+   restriction it kept retrying the denied namespace (191 capability faults)
+   rather than adapting. Runtime-enforced capabilities closed a leak that a
+   prompt rule would not have.
+3. **It barely uses notes.** There were only 13 WRITEs. With a stateless
+   processor that means re-deriving state each step, which is exactly what the
+   working-set ablation shows is fatal once eviction kicks in.
+
+Next step when credit is available: re-run with the fixed parser (30 tasks at
+10³ and 10⁶, CVM vs tool calling). A stronger model (`deepseek-v4-pro`, Claude),
+and a variant whose system prompt states the investigation method, would
+separate "can't reason" from "doesn't know the method".
 
 ## Known limitations
 
