@@ -277,5 +277,53 @@ class CustomStoreExampleTests(unittest.TestCase):
         self.assertTrue(ctx2.last_result.startswith("CAPABILITY_FAULT"))
 
 
+class RunLLMTests(unittest.TestCase):
+    """experiments/run_llm.py end to end with the free reference provider."""
+
+    def _run(self, *extra):
+        import json
+        from experiments import run_llm
+        out = tempfile.mkdtemp(prefix="cvm-runllm-")
+        old = os.environ.get("CVM_CACHE")
+        os.environ["CVM_CACHE"] = TMP
+        try:
+            run_llm.main(["--provider", "reference", "--sizes", "600", "--tasks", "9",
+                          "--workers", "3", "--out-dir", out, "--tag", "t", *extra])
+        finally:
+            if old is None:
+                os.environ.pop("CVM_CACHE", None)
+            else:
+                os.environ["CVM_CACHE"] = old
+        with open(os.path.join(out, "llm_t.json")) as f:
+            return json.load(f)
+
+    def test_max_objects_caps_residency_and_is_recorded(self):
+        for k in (4, 2):
+            rep = self._run("--max-objects", str(k))
+            self.assertEqual(rep["max_objects"], k)
+            c = rep["sizes"][0]["conditions"]["cvm"]
+            self.assertLessEqual(c["peak_resident_objects_max"], k)
+            self.assertEqual(c["accuracy"], 1.0)  # notes carry the state across evictions
+            self.assertGreater(sum(r["evictions"] for r in rep["sizes"][0]["runs"]), 0)
+
+    def test_default_working_set_is_32(self):
+        rep = self._run()
+        self.assertEqual(rep["max_objects"], 32)
+
+    def test_summaries_follow_the_data(self):
+        from experiments.run_llm import accuracy_by
+        runs = [{"depth": 5, "kind": "x", "correct": 1}, {"depth": 5, "kind": "y", "correct": 0},
+                {"depth": 1, "kind": "x", "correct": 1}]
+        self.assertEqual(accuracy_by(runs, "depth"), {1: 1.0, 5: 0.5})
+        self.assertEqual(accuracy_by(runs, "kind"), {"x": 1.0, "y": 0.0})
+
+    def test_rejects_bad_arguments(self):
+        from experiments import run_llm
+        with self.assertRaises(SystemExit):
+            run_llm.main(["--provider", "reference", "--conditions", "full"])
+        with self.assertRaises(SystemExit):
+            run_llm.main(["--provider", "reference", "--max-objects", "0"])
+
+
 if __name__ == "__main__":
     unittest.main()

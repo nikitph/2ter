@@ -18,7 +18,9 @@ external world while it only ever sees a small, bounded *resident view*:
 The original spec is in `docs/SPEC.md`; user-facing docs are in `README.md`.
 
 **Status: V0 is done and validated. V1 (training a model to fault instead of
-guess) is planned in `PLAN_V1.md` and not started.**
+guess) is planned in `PLAN_V1.md`. M0's code slice is done (`--max-objects`,
+reference sanity check at 32/4 objects, all 1.00; see `RESULTS_V1.md`). M0's
+model baselines are pending, because they need a served endpoint.**
 
 - Repo: `nikitph/2ter`. V0 was merged to `master` via
   https://github.com/nikitph/2ter/pull/2. Do follow-up work on a new branch
@@ -85,7 +87,7 @@ cvm/processors.py       parse_prompt(), ReferenceReasoner (_Policy), Hallucinato
 cvm/experiment.py       make_tasks, run_cvm / run_agent / run_rag / FullContext, _metrics
 experiments/            run_scale.py, run_ablations.py, run_llm.py, show_trace.py, plot.py
 examples/custom_store.py  how to plug in your own data (tested)
-tests/test_cvm.py       20 tests: python -m unittest tests.test_cvm
+tests/test_cvm.py       24 tests: python -m unittest tests.test_cvm
 results/                committed outputs (see RESULTS_V0.md "Files in results/")
 docs/                   SPEC.md, literature-review.md, research-notes/
 ```
@@ -98,7 +100,8 @@ python experiments/run_scale.py                     # ~2–3 min; rewrites resul
 python experiments/run_ablations.py                 # ~20 s; rewrites results/ablations.json
 python experiments/plot.py                          # regenerate SVGs from scale.json
 python experiments/show_trace.py --size 1000        # see a full run and the prompt
-python experiments/run_llm.py --provider reference --sizes 1000 --tasks 6 --tag smoke   # free LLM-harness smoke test
+python experiments/run_llm.py --provider reference --sizes 1000 --tasks 6 --tag smoke --out-dir /tmp/smoke   # free LLM-harness smoke test
+python experiments/run_llm.py --provider reference --sizes 1000,1000000 --tasks 30 --max-objects 4 --tag m0-reference-ws4   # M0 sanity cell
 DEEPSEEK_API_KEY=... python experiments/run_llm.py --provider deepseek --model deepseek-flash \
     --sizes 1000000 --tasks 30 --conditions cvm --workers 10 --max-steps 50 --tag <tag>
 ```
@@ -185,6 +188,14 @@ Other flags: `--hint` adds `METHOD_HINT` to the system prompt;
   solve custom tasks (e.g. `examples/custom_store.py`); use an LLM processor.
 
 ## Known weaknesses and open items (prioritized)
+
+0. **Plan corrections already folded into PLAN_V1.md; keep them in mind:**
+   - `run_llm.py` supports only `cvm` and `agent`. M0b's full-context
+     comparison needs a new `full` condition.
+   - `ReferenceReasoner` handles incident tasks only. `domain2` needs its own
+     `CodeReferenceReasoner`, for validation only and never for training data.
+   - The runner's depth and kind summaries now follow the data, so they are no
+     longer fixed to depths 1–3.
 
 1. **V1**, per `PLAN_V1.md`: M0 baselines → **M0b small-model + method test**
    (the owner's main interest: can CVM plus the method make small models

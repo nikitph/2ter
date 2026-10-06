@@ -157,7 +157,7 @@ from the standard library hold the synthetic world.
 
 ```bash
 git clone <this repo> && cd 2ter/cvm
-python -m unittest tests.test_cvm           # 20 tests, ~1 s
+python -m unittest tests.test_cvm           # 24 tests, ~1 s
 python examples/custom_store.py             # prints the resident view for a tiny code-repo world
 python experiments/show_trace.py --size 1000  # one full reference run, step by step
 ```
@@ -235,6 +235,7 @@ ANTHROPIC_API_KEY=... python experiments/run_llm.py --provider claude --model cl
     --sizes 1000000 --tasks 30 --conditions cvm
 
 # add --hint to give the model the investigation method (separates "can't reason" from "wasn't told how")
+# add --max-objects 4 to shrink the working set (default 32); --out-dir to write results elsewhere
 # add --conditions cvm,agent to also run conventional tool calling (expensive at 1e6: ~100k-token prompts)
 ```
 
@@ -269,7 +270,7 @@ never write them into files. The scripts only read them from the environment.
 
 | Command | What | Time |
 |---|---|---|
-| `python -m unittest tests.test_cvm` | 20 tests | ~1 s |
+| `python -m unittest tests.test_cvm` | 24 tests | ~1 s |
 | `python experiments/run_scale.py` | Headline: 5 conditions × 10²…10⁶ objects × 90 tasks → `results/scale.json` | ~2–3 min (first run builds worlds, ~35 s for 10⁶) |
 | `python experiments/run_ablations.py` | Working-set/notes sweep, cache/prefetch, verifier, capabilities, context switching at 10⁶ → `results/ablations.json` | ~20 s |
 | `python experiments/plot.py` | Regenerates the two SVG charts from `scale.json` | <1 s |
@@ -294,11 +295,12 @@ cvm/
   experiment.py       tasks, conditions A/B/B2/C/D, metrics
 experiments/          run_scale, run_ablations, run_llm, show_trace, plot
 examples/             custom_store.py: plug in your own data
-tests/                test_cvm.py (20 tests)
+tests/                test_cvm.py (24 tests)
 results/              all raw results and charts (see RESULTS_V0.md)
 docs/                 SPEC.md (the original v0.1 spec), literature-review.md, research-notes/
 README.md             this file
 RESULTS_V0.md         full results
+RESULTS_V1.md         V1 results as milestones land (M0 so far)
 PLAN_V1.md            next phase: training a model to fault instead of guess
 CLAUDE.md             handoff notes for the next Claude Code session
 ```
