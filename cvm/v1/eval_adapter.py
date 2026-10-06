@@ -19,6 +19,8 @@ def main(argv=None):
     ap.add_argument("--adapter-dir", type=Path, required=True)
     ap.add_argument("--val", type=Path, required=True)
     ap.add_argument("--examples", type=int, default=256)
+    ap.add_argument("--ops", default="",
+                    help="optional comma-separated expected operations, e.g. SEARCH,ANSWER")
     ap.add_argument("--max-length", type=int, default=4096)
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args(argv)
@@ -26,7 +28,8 @@ def main(argv=None):
         ap.error("examples must be positive and max-length must exceed 256")
     if not (args.adapter_dir / "adapter_config.json").is_file():
         ap.error("adapter-dir must contain adapter_config.json")
-    rows, seeds = load_examples(args.val, args.examples)
+    ops = {op.strip().upper() for op in args.ops.split(",") if op.strip()}
+    rows, seeds = load_examples(args.val, args.examples, ops or None)
 
     import torch
     from peft import AutoPeftModelForCausalLM
@@ -40,7 +43,8 @@ def main(argv=None):
     metrics = evaluate_actions(model, tokenizer, rows, args.examples,
                                args.max_length)
     metrics.update({"adapter_dir": str(args.adapter_dir),
-                    "validation_world_seeds": sorted(seeds)})
+                    "validation_world_seeds": sorted(seeds),
+                    "expected_ops_filter": sorted(ops) if ops else None})
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(metrics, indent=2) + "\n")
     print(json.dumps(metrics, indent=2), flush=True)

@@ -48,7 +48,8 @@ def resolve_checkpoint(output_dir: Path, value: str | None) -> str | None:
     return str(checkpoints[-1])
 
 
-def load_examples(path: Path, limit: int = 0) -> tuple[list[dict], set[int]]:
+def load_examples(path: Path, limit: int = 0,
+                  ops: set[str] | None = None) -> tuple[list[dict], set[int]]:
     """Convert chat JSONL to conversational prompt/completion rows for TRL."""
     rows: list[dict] = []
     seeds: set[int] = set()
@@ -63,6 +64,8 @@ def load_examples(path: Path, limit: int = 0) -> tuple[list[dict], set[int]]:
                 raise ValueError(f"invalid action in {path}")
             if item["meta"]["task_kind"] == "code_cause":
                 raise ValueError("domain2 must stay held out of training")
+            if ops is not None and action["op"] not in ops:
+                continue
             seeds.add(int(item["meta"]["world_seed"]))
             rows.append({"prompt": messages[:2], "completion": messages[2:]})
             if limit and len(rows) >= limit:

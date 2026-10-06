@@ -190,3 +190,22 @@ This is below M3's 95% operation target, so training resumed from checkpoint
 34 with the original one-epoch schedule. The exact result is
 `results/v1_adapter_val_step34.json`. This gate measures individual actions;
 full held-out task accuracy remains unmeasured until M4.
+
+**Second action-level gate, checkpoint 40.** After resuming from 34, held-out
+loss fell to 0.012 at step 40. The same 256-prompt validation sample scored
+255/256 valid JSON, 244/256 correct operations (**95.3%**), and 233/256 exact
+actions (91.0%). The operation breakdown matters:
+
+| Expected operation | Correct operation |
+|---|---:|
+| WRITE | 110/110 |
+| FAULT | 62/63 |
+| TRAVERSE | 61/62 |
+| EVIDENCE | 3/3 |
+| ANSWER | 7/8 |
+| SEARCH | **1/10** |
+
+The aggregate M3 operation target is met on this sample, but SEARCH remains
+weak, so training continues from checkpoint 40. The detailed result is
+`results/v1_adapter_val_step40.json`. A larger, operation-stratified check
+and task-level M4 runs are needed before treating the adapter as ready.
