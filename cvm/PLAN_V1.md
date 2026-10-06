@@ -84,8 +84,16 @@ done
   the `cvm` condition only.
 - **Done:** the reference sanity check through the runner. Results are in
   `RESULTS_V1.md` §M0.
-- **Pending:** model baselines. These need a served endpoint (a local vLLM or
-  a hosted API key); the machine that did M0 had neither.
+- **Done:** DeepSeek-V4.1-Flash baseline at 10⁶, 40 tasks per cell:
+  - WS=32: accuracy 0.68;
+  - WS=4: accuracy **0.10**, thrash 0.59, 22 of 40 tasks hit the step limit,
+    about 1 note per task.
+
+  An untrained model collapses under a tight working set because it doesn't
+  keep notes. The reference processor at WS=4 scores 1.00. See
+  `RESULTS_V1.md`.
+- **Pending:** a baseline for the open model that will actually be fine-tuned
+  (M3). It needs a served endpoint (vLLM).
 
 Done when: `results/llm_base-*.json` exist for WS=32 and WS=4.
 
@@ -539,7 +547,8 @@ fine-tuning service.
 ## 7. Checklist
 
 - [x] M0 (code): `--max-objects` flag + tests; data-driven depth/kind summaries; reference sanity at WS=32/4 (1.00 everywhere)
-- [ ] M0 (models): base model at WS=32 and WS=4 on 10⁶ (n≥100) — needs a served endpoint
+- [x] M0 (DeepSeek-V4.1-Flash): WS=32 → 0.68, WS=4 → 0.10 (thrash 0.59), n=40 per cell
+- [ ] M0 (fine-tune base model): WS=32 and WS=4 on 10⁶ — needs a served endpoint
 - [ ] M0b: `full` condition in `run_llm.py`; small vs 7–8B model × {plain, hint} × {WS=32, WS=4} at 10⁶, plus same small model without CVM at 10³
 - [x] M1: `export_trajectories.py` + replay test + `data/v1/{train,val}.jsonl`
 - [x] M2: `depth_range`, `traps`, `tight`, `domain2` (`synthetic_code_world.py` + `CodeReferenceReasoner`, validation only); reference = 1.00 on all splits
