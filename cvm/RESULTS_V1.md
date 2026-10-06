@@ -165,11 +165,9 @@ operation on 1/4. These tiny, partially trained evaluations check the
 pipeline only; they are not model performance estimates.
 
 The full exported dataset was copied to the persistent volume and all three
-file SHA-256 hashes matched the local files. A 100,000-example training run
-has started with checkpoint saves every two optimizer steps, evaluation every
-ten steps, and a four-hour training time limit. Its progress and final
-metrics will be recorded below when this first budgeted segment ends.
-Machine-readable details: `results/v1_a100_sanity.json`.
+file SHA-256 hashes matched the local files. The 100,000-example run saves
+every two optimizer steps and evaluates loss every ten steps. Machine-readable
+pilot details: `results/v1_a100_sanity.json`.
 
 The first ten full-size optimizer steps took 8 minutes 34 seconds including
 one 256-example evaluation (53 seconds). GPU memory reached about 51 GB and
@@ -177,3 +175,18 @@ the first held-out loss was 0.704. If this early rate holds, 1,563 steps
 (one epoch) would take roughly 22 GPU hours, about $35 at the selected
 $1.59/hour rate, plus startup and storage. This is an estimate, not a
 completed-run measurement; the initial $10 balance cannot cover an epoch.
+
+**First action-level gate, checkpoint 34.** Held-out loss fell from 0.704 at
+step 10 to 0.192 at step 20 and 0.042 at step 30. The training process was
+paused after a complete checkpoint 34 to score 256 held-out prompts:
+
+| Metric | Result |
+|---|---:|
+| Valid JSON | 252/256 (98.4%) |
+| Correct operation | 229/256 (89.5%) |
+| Exact action | 206/256 (80.5%) |
+
+This is below M3's 95% operation target, so training resumed from checkpoint
+34 with the original one-epoch schedule. The exact result is
+`results/v1_adapter_val_step34.json`. This gate measures individual actions;
+full held-out task accuracy remains unmeasured until M4.
