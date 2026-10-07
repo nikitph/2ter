@@ -228,6 +228,10 @@ The runner now writes a durable record after each completed task. An
 interrupted reference-provider test resumed the unfinished task without
 repeating the three completed tasks, rebuilt all four traces and the summary,
 and recovered from a deliberately truncated final journal line. A second
-test rejected a resume with changed task settings. The full local suite
-passed 39 tests. Model-level M4 cells are still pending a served base model
+test rejected a resume with changed task settings. The serving preflight also
+identified two configuration requirements: the rank-32 adapter needs
+`--max-lora-rank 32` (vLLM defaults to 16), and a bounded response allowance
+is needed with an 8192-token server window. `run_llm.py` now records and
+applies `--max-output-tokens`; the M4 command uses 512. The full local suite
+passed 40 tests. Model-level M4 cells are still pending a served base model
 and the saved adapter on a GPU.

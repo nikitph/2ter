@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -310,6 +311,18 @@ class RunLLMTests(unittest.TestCase):
         rep = self._run()
         self.assertEqual(rep["max_objects"], 32)
 
+    def test_output_token_limit_is_recorded_and_passed_to_endpoint_processor(self):
+        from types import SimpleNamespace
+        from experiments import run_llm
+        rep = self._run("--max-output-tokens", "512")
+        self.assertEqual(rep["max_output_tokens"], 512)
+        args = SimpleNamespace(provider="openai-compatible", model="base",
+                               base_url="http://localhost:8000/v1", api_key_env="VLLM_KEY",
+                               max_output_tokens=512, hint=False)
+        with patch.dict(os.environ, {"VLLM_KEY": "local"}):
+            proc = run_llm.make_processor(args)
+        self.assertEqual(proc.max_tokens, 512)
+
     def test_summaries_follow_the_data(self):
         from experiments.run_llm import accuracy_by
         runs = [{"depth": 5, "kind": "x", "correct": 1}, {"depth": 5, "kind": "y", "correct": 0},
@@ -323,6 +336,8 @@ class RunLLMTests(unittest.TestCase):
             run_llm.main(["--provider", "reference", "--conditions", "rag"])
         with self.assertRaises(SystemExit):
             run_llm.main(["--provider", "reference", "--max-objects", "0"])
+        with self.assertRaises(SystemExit):
+            run_llm.main(["--provider", "reference", "--max-output-tokens", "0"])
 
 
 class TrajectoryExportTests(unittest.TestCase):

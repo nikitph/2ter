@@ -96,6 +96,27 @@ or further training is complete.
 
 ## Interrupted model evaluations
 
+The first vLLM attempt installed a CUDA 13 build that could not run on the
+CUDA 12.8 pod driver. Use a separate CUDA 12.8 environment and verify it
+before serving. The current vLLM 0.11.x documentation supports the CUDA 12.8
+PyTorch index; do not reuse an unverified partial installation on the volume.
+The adapter has rank 32, above vLLM's default maximum of 16.
+
+```bash
+python3 -m venv /workspace/vllm-cu128
+/workspace/vllm-cu128/bin/pip install 'vllm==0.11.0' \
+  --extra-index-url https://download.pytorch.org/whl/cu128
+HF_HOME=/workspace/hf-cache /workspace/vllm-cu128/bin/vllm serve \
+  Qwen/Qwen2.5-7B-Instruct --enable-lora --max-lora-rank 32 \
+  --lora-modules cvm=/workspace/cvm-v1-full/train/adapter \
+  --max-model-len 8192 --host 127.0.0.1 --port 8000
+```
+
+Confirm `/v1/models` lists both the base model and `cvm`, then run a
+one-task pilot using a unique tag. For full CVM cells, pass
+`--max-output-tokens 512` so an action response and its prompt fit the server
+window. Train and serve sequentially: both need the A100's memory.
+
 Run `experiments/run_llm.py` with a separate `--tag` for each base or adapter
 cell and write `--out-dir` to `/workspace/cvm-v1-full/eval/`. It journals each
 completed task to `llm_<tag>_progress.jsonl` with an `fsync`. Rerun an

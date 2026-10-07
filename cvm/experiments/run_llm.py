@@ -35,6 +35,7 @@ def make_processor(args, domain="incident"):
         from cvm.processors import CODE_METHOD_HINT, METHOD_HINT
         return ChatCompletionsProcessor(model=args.model or "deepseek-chat",
                                         base_url=args.base_url, api_key_env=args.api_key_env,
+                                        max_tokens=args.max_output_tokens,
                                         system_extra=(CODE_METHOD_HINT if domain == "code" else METHOD_HINT)
                                         if args.hint else "")
     if args.provider == "claude":
@@ -99,6 +100,8 @@ def main(argv=None):
     ap.add_argument("--conditions", default="cvm")
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--max-steps", type=int, default=60)
+    ap.add_argument("--max-output-tokens", type=int, default=8192,
+                    help="maximum tokens for one OpenAI-compatible action response")
     ap.add_argument("--max-objects", type=int, default=32,
                     help="CVM working-set size (resident objects); applies to the cvm condition only")
     ap.add_argument("--out-dir", default=RESULTS, help="where llm_<tag>.json and traces are written")
@@ -120,6 +123,8 @@ def main(argv=None):
     tag = args.tag or model
     if args.max_objects < 1:
         ap.error("--max-objects must be >= 1")
+    if args.max_output_tokens < 1:
+        ap.error("--max-output-tokens must be >= 1")
     conditions = args.conditions.split(",")
     unknown = [c for c in conditions if c not in ("cvm", "agent", "full")]
     if unknown:
@@ -129,7 +134,8 @@ def main(argv=None):
               "the agent baseline keeps an unbounded transcript", file=sys.stderr)
     report = {"provider": args.provider, "model": model, "method_hint": args.hint,
               "tasks_per_size": args.tasks, "max_steps": args.max_steps,
-              "max_objects": args.max_objects, "split": args.split, "sizes": []}
+              "max_objects": args.max_objects, "max_output_tokens": args.max_output_tokens,
+              "split": args.split, "sizes": []}
     os.makedirs(args.out_dir, exist_ok=True)
     progress_path = Path(args.out_dir) / f"llm_{tag}_progress.jsonl"
     config = {key: value for key, value in vars(args).items()

@@ -296,14 +296,25 @@ accuracy on `val.jsonl` is ≥ 95%.
 ### M4: Serve and evaluate
 
 ```bash
-pip install vllm
-vllm serve <base-model> --enable-lora --lora-modules cvm=<path-to-adapter> --port 8000
+vllm serve Qwen/Qwen2.5-7B-Instruct --enable-lora --max-lora-rank 32 \
+  --lora-modules cvm=<path-to-adapter> --max-model-len 8192 \
+  --host 127.0.0.1 --port 8000
 export VLLM_KEY=local
 for split in iid scale deep traps tight domain2; do
   python experiments/run_llm.py --provider openai-compatible --base-url http://localhost:8000/v1 \
-     --api-key-env VLLM_KEY --model cvm --split $split --tasks 100 --tag v1-sft-$split
+     --api-key-env VLLM_KEY --model cvm --max-output-tokens 512 \
+     --split $split --tasks 100 --tag v1-sft-$split
 done
 ```
+
+Use a vLLM build compatible with the pod's CUDA driver, in a separate
+environment from the training dependencies. The adapter uses LoRA rank 32;
+vLLM's default maximum rank is 16, so `--max-lora-rank 32` is required.
+`--max-output-tokens 512` keeps the one-action response within the server's
+8192-token request window even when the CVM prompt is a few thousand tokens.
+Check `/v1/models` and run a distinct one-task pilot tag before the 100-task
+cells. Serve the base and adapter from the same engine to compare them on
+identical task seeds.
 
 The runner writes a per-task `llm_<tag>_progress.jsonl` journal. If a pod
 stops during a cell, rerun the same command with `--resume`; completed tasks
