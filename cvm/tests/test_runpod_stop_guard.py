@@ -1,7 +1,10 @@
 """Offline checks for the independent pod billing guard."""
 import unittest
+from pathlib import Path
+from unittest.mock import patch
+from subprocess import CompletedProcess
 
-from v1.runpod_stop_guard import stop_at_deadline
+from v1.runpod_stop_guard import RunpodCli, stop_at_deadline
 
 
 class FakeClock:
@@ -29,6 +32,29 @@ class FakePod:
 
 
 class RunpodGuardTest(unittest.TestCase):
+    def test_cli_reads_runtime_state_and_accepts_plaintext_stop(self):
+        cli = RunpodCli(Path("/usr/local/bin/runpodctl"))
+        responses = [
+            CompletedProcess([], 0, '[{"id":"pod-1","runtimeStatus":"running","desiredStatus":"RUNNING"}]', ""),
+            CompletedProcess([], 0, "pod stopped", ""),
+            CompletedProcess([], 0, '{"pods":[{"id":"pod-1","runtimeStatus":"stopped","desiredStatus":"EXITED"}]}', ""),
+        ]
+        with patch("v1.runpod_stop_guard.subprocess.run", side_effect=responses) as run:
+            self.assertEqual(cli.status("pod-1"), "RUNNING")
+            cli.stop("pod-1")
+            self.assertEqual(cli.status("pod-1"), "STOPPED")
+        self.assertEqual(run.call_args_list[0].args[0][1:],
+                         ["pod", "list", "--all", "--output", "json"])
+        self.assertEqual(run.call_args_list[1].args[0][1:],
+                         ["pod", "stop", "pod-1"])
+
+    def test_cli_rejects_missing_pod(self):
+        cli = RunpodCli(Path("/usr/local/bin/runpodctl"))
+        with patch("v1.runpod_stop_guard.subprocess.run",
+                   return_value=CompletedProcess([], 0, "[]", "")):
+            with self.assertRaisesRegex(RuntimeError, "absent"):
+                cli.status("pod-1")
+
     def test_stops_only_after_deadline_and_confirms_state(self):
         clock = FakeClock()
         pod = FakePod()

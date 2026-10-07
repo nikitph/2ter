@@ -12,15 +12,15 @@ import subprocess
 import time
 from pathlib import Path
 
-ACTIVE = {"RUNNING", "STARTING", "PROVISIONING"}
-STOPPED = {"EXITED", "ERROR", "TERMINATED"}
+ACTIVE = {"RUNNING", "STARTING", "PROVISIONING", "INITIALIZING"}
+STOPPED = {"EXITED", "STOPPED", "ERROR", "TERMINATED"}
 
 
 class RunpodCli:
     def __init__(self, binary: Path):
         self.binary = binary
 
-    def call(self, *args: str) -> dict:
+    def call(self, *args: str) -> str:
         command = [str(self.binary), *args]
         result = subprocess.run(command, text=True, capture_output=True,
                                 timeout=45, check=False)
@@ -31,14 +31,25 @@ class RunpodCli:
                 error = {"code": "cli_error", "error": result.stderr[:200]}
             raise RuntimeError(f"runpodctl {args[0]} {args[1]} failed: "
                                f"{error.get('code')}: {error.get('error')}")
-        try:
-            return json.loads(result.stdout)
-        except ValueError as exc:
-            raise RuntimeError("runpodctl returned non-JSON output") from exc
+        return result.stdout
 
     def status(self, pod_id: str) -> str:
-        pod = self.call("pod", "get", pod_id)
-        return str(pod.get("status", "")).upper()
+        # `pod get` may print a table. `pod list --all` is documented as JSON
+        # and includes stopped pods so the stop can be verified afterwards.
+        output = self.call("pod", "list", "--all", "--output", "json")
+        try:
+            listing = json.loads(output)
+        except ValueError as exc:
+            raise RuntimeError("runpodctl pod list returned non-JSON output") from exc
+        pods = listing if isinstance(listing, list) else listing.get("pods")
+        if not isinstance(pods, list):
+            raise RuntimeError("runpodctl pod list returned an unknown JSON shape")
+        pod = next((item for item in pods if item.get("id") == pod_id), None)
+        if pod is None:
+            raise RuntimeError(f"pod {pod_id} is absent from runpodctl pod list --all")
+        runtime = str(pod.get("runtimeStatus") or "").upper()
+        desired = str(pod.get("desiredStatus") or pod.get("status") or "").upper()
+        return runtime if runtime and runtime != "UNKNOWN" else desired
 
     def stop(self, pod_id: str) -> None:
         self.call("pod", "stop", pod_id)
