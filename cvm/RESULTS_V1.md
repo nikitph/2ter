@@ -206,6 +206,16 @@ actions (91.0%). The operation breakdown matters:
 | SEARCH | **1/10** |
 
 The aggregate M3 operation target is met on this sample, but SEARCH remains
-weak, so training continues from checkpoint 40. The detailed result is
+weak, so training resumed from checkpoint 40. The detailed result is
 `results/v1_adapter_val_step40.json`. A larger, operation-stratified check
 and task-level M4 runs are needed before treating the adapter as ready.
+
+**Runpod budget stop.** At 2026-10-07 01:46 UTC, Runpod reported no pod and
+`get_pod` returned 404. The 50 GB network volume still existed in EU-RO-1.
+The billing API showed $10.001 GPU, $0.026 pod disk, and $0.029 network
+volume charges ($10.056 total). The pod was not stopped before the available
+credit was consumed. The last checkpoint inspected over SSH was step 40, and
+the last live training step observed was 48. The status of later checkpoints
+and the second training segment's final metrics cannot be verified until the
+volume is mounted again. No GPU pod was running at the time of this check.
+The machine-readable audit is `results/v1_runpod_segment_2026-10-06.json`.

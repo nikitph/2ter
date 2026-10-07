@@ -2,10 +2,12 @@
 
 The first run uses a Runpod Secure Cloud A100 SXM4 80 GB in EU-RO-1. Its
 50 GB persistent network volume is `pxenkl4pyw`, mounted at `/workspace`.
-The pod is `kg9fz30agzl7kc` while this training segment is active. A stopped
-pod can be restarted; a replacement pod must be in the same data center and
-mount the same volume. Stopping a pod stops GPU billing; the volume remains
-billed while retained.
+The first pod was `kg9fz30agzl7kc`. As of 2026-10-07 01:46 UTC it was absent
+from Runpod's pod inventory; the volume remained present. A replacement pod
+must be in the same data center and mount that volume. Stop the replacement
+pod through the Runpod API or console as soon as the training process exits:
+`--time-limit-minutes` stops Python training, **not pod billing**. The volume
+remains billed while retained, at about $0.00486/hour for 50 GB in this run.
 
 The verified full export is at `/workspace/cvm-v1-full/data/` and the base
 model cache is at `/workspace/hf-cache/`. Training output is in
@@ -50,3 +52,11 @@ The first run was started with these options except without
 `--resume-from-checkpoint auto`. It saves every two optimizer steps and
 evaluates every ten. Early action-level accuracy is a diagnostic only; M3's
 target is at least 95% correct operation selection on held-out validation.
+
+Before resuming, inspect `checkpoints/` and `metrics.json` on the mounted
+volume. Checkpoint 40 is the last one independently verified before the pod
+disappeared; a later checkpoint may exist. After starting a replacement pod,
+install `v1/requirements.txt` into its PyTorch template and update the repo
+checkout. The model cache and exported data are on the volume. Do not start a
+new training process while another one is running. The first credit was fully
+used; arrange a pod-level stop mechanism before another long segment.
