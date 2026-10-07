@@ -236,6 +236,9 @@ On the same 256 held-out action prompts used for checkpoint 40, checkpoint
 are `results/v1_train_step203_metrics.json` and
 `results/v1_adapter_val_step203.json`. This is action-level evidence only;
 the base-versus-adapter task-level comparison is still in progress.
+An operation-stratified check on another 128 held-out prompts scored
+**67/69 SEARCH** and **56/59 ANSWER** exactly, with 123/128 operations correct
+overall (`results/v1_adapter_val_step203_search_answer.json`).
 
 ## M4: Evaluation runner readiness
 
