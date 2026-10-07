@@ -225,6 +225,18 @@ The action evaluator now accepts a complete Trainer checkpoint directly if
 the interrupted run did not save a final adapter directory; it loads the
 base-model tokenizer recorded in the checkpoint's PEFT config.
 
+**Recovered training result, checkpoint 203.** On 2026-10-07 the retained
+volume was remounted. The previous segment had completed step 203 of 1,563
+and saved both a complete Trainer checkpoint and a final adapter with identical
+weight hashes. Its lowest recorded validation loss was 0.000964 at step 180;
+the final 32-prompt diagnostic was 32/32 exact but contained no SEARCH cases.
+On the same 256 held-out action prompts used for checkpoint 40, checkpoint
+203 produced 255/256 valid JSON, **253/256 correct operations (98.8%)**, and
+**252/256 exact actions (98.4%)**. SEARCH improved to 9/10. The raw outputs
+are `results/v1_train_step203_metrics.json` and
+`results/v1_adapter_val_step203.json`. This is action-level evidence only;
+the base-versus-adapter task-level comparison is still in progress.
+
 ## M4: Evaluation runner readiness
 
 The runner now writes a durable record after each completed task. An
