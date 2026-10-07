@@ -26,7 +26,7 @@ HF_HOME=/workspace/hf-cache python3 -u v1/train_lora.py \
   --train-examples 100000 --val-examples 256 \
   --max-steps -1 --grad-accum 64 --eval-steps 10 --save-steps 2 \
   --eval-generation-examples 32 --resume-from-checkpoint auto \
-  --time-limit-minutes 240
+  --time-limit-minutes 180
 ```
 
 `auto` selects the highest numbered complete Trainer checkpoint. The time
@@ -48,10 +48,11 @@ HF_HOME=/workspace/hf-cache python3 v1/eval_adapter.py \
   --out /workspace/cvm-v1-full/adapter_val_256.json
 ```
 
-The first run was started with these options except without
-`--resume-from-checkpoint auto`. It saves every two optimizer steps and
-evaluates every ten. Early action-level accuracy is a diagnostic only; M3's
-target is at least 95% correct operation selection on held-out validation.
+The first run used a four-hour time limit and started without
+`--resume-from-checkpoint auto`. The next run uses three hours to leave time
+for validation before the independent billing guard fires. Early action-level
+accuracy is a diagnostic only; M3's target is at least 95% correct operation
+selection on held-out validation.
 
 Before resuming, inspect `checkpoints/` and `metrics.json` on the mounted
 volume. Checkpoint 40 is the last one independently verified before the pod
@@ -60,3 +61,32 @@ install `v1/requirements.txt` into its PyTorch template and update the repo
 checkout. The model cache and exported data are on the volume. Do not start a
 new training process while another one is running. The first credit was fully
 used; arrange a pod-level stop mechanism before another long segment.
+
+## Independent billing guard for the next pod
+
+Runpod's published CLI page mentions `pod create --stop-after`, but the
+installed `runpodctl` 2.14.0 does not expose that flag. The next pod must
+therefore have an independent local guard before training begins.
+`v1/runpod_stop_guard.py` uses authenticated `runpodctl` to stop a specific
+pod at a deadline and confirms the resulting state. It runs on the Mac,
+outside the Codex session and GPU container. Configure CLI authentication
+locally with `runpodctl doctor` or `RUNPOD_API_KEY`; never put the key in the
+repository or chat. Verify `runpodctl user` succeeds first.
+
+Once the replacement pod is RUNNING, from the `cvm/` directory on the Mac:
+
+```bash
+python3 v1/runpod_stop_guard.py --pod-id <new-pod-id> \
+  --after-minutes 210 --preflight-only
+nohup caffeinate -dimsu python3 -u v1/runpod_stop_guard.py \
+  --pod-id <new-pod-id> --after-minutes 210 \
+  > /tmp/cvm-runpod-guard.log 2>&1 < /dev/null &
+```
+
+Confirm the log contains `GUARD_READY` before starting training. Set training
+`--time-limit-minutes 180`, leaving 30 minutes for checkpoint finalization,
+validation, and transfer before the guard stops the pod. If training ends
+earlier, stop the pod immediately through Runpod and verify it is no longer
+RUNNING. The guard is a fallback if the Codex session is interrupted. The
+volume persists after the pod stops; retain it until checkpoints are copied
+or further training is complete.

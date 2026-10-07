@@ -1,0 +1,97 @@
+"""Independent local deadline guard for a billable Runpod pod.
+
+Run this on a computer that stays awake, using an authenticated runpodctl.
+Start and verify the guard before starting a long training process. It stops
+the named pod after the specified number of minutes even if Codex disconnects.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import time
+from pathlib import Path
+
+ACTIVE = {"RUNNING", "STARTING", "PROVISIONING"}
+STOPPED = {"EXITED", "ERROR", "TERMINATED"}
+
+
+class RunpodCli:
+    def __init__(self, binary: Path):
+        self.binary = binary
+
+    def call(self, *args: str) -> dict:
+        command = [str(self.binary), *args]
+        result = subprocess.run(command, text=True, capture_output=True,
+                                timeout=45, check=False)
+        if result.returncode:
+            try:
+                error = json.loads(result.stderr.splitlines()[0])
+            except (IndexError, ValueError):
+                error = {"code": "cli_error", "error": result.stderr[:200]}
+            raise RuntimeError(f"runpodctl {args[0]} {args[1]} failed: "
+                               f"{error.get('code')}: {error.get('error')}")
+        try:
+            return json.loads(result.stdout)
+        except ValueError as exc:
+            raise RuntimeError("runpodctl returned non-JSON output") from exc
+
+    def status(self, pod_id: str) -> str:
+        pod = self.call("pod", "get", pod_id)
+        return str(pod.get("status", "")).upper()
+
+    def stop(self, pod_id: str) -> None:
+        self.call("pod", "stop", pod_id)
+
+
+def stop_at_deadline(client, pod_id: str, minutes: float, interval: float,
+                     clock=time.monotonic, sleep=time.sleep) -> str:
+    status = client.status(pod_id)
+    if status not in ACTIVE:
+        raise RuntimeError(f"guard requires an active pod, got {status!r}")
+    deadline = clock() + minutes * 60
+    print(f"GUARD_READY pod={pod_id} status={status} stop_after_minutes={minutes}",
+          flush=True)
+    while clock() < deadline:
+        sleep(min(interval, deadline - clock()))
+    for attempt in range(20):
+        try:
+            status = client.status(pod_id)
+            if status in STOPPED:
+                print(f"GUARD_DONE pod={pod_id} status={status}", flush=True)
+                return status
+            if status not in ACTIVE:
+                raise RuntimeError(f"unknown pod status {status!r}")
+            client.stop(pod_id)
+        except (RuntimeError, subprocess.TimeoutExpired) as exc:
+            print(f"GUARD_RETRY attempt={attempt + 1} error={exc}", flush=True)
+        sleep(interval)
+    raise RuntimeError(f"could not verify that pod {pod_id} stopped")
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--pod-id", required=True)
+    ap.add_argument("--after-minutes", type=float, required=True)
+    ap.add_argument("--interval-seconds", type=float, default=30)
+    ap.add_argument("--runpodctl", type=Path,
+                    default=Path.home() / ".local/bin/runpodctl")
+    ap.add_argument("--preflight-only", action="store_true")
+    args = ap.parse_args(argv)
+    if args.after_minutes <= 0 or args.interval_seconds <= 0:
+        ap.error("after-minutes and interval-seconds must be positive")
+    if not args.runpodctl.is_file():
+        ap.error(f"runpodctl not found: {args.runpodctl}")
+    client = RunpodCli(args.runpodctl)
+    if args.preflight_only:
+        status = client.status(args.pod_id)
+        if status not in ACTIVE:
+            raise SystemExit(f"pod is not active: {status}")
+        print(f"GUARD_PREFLIGHT_OK pod={args.pod_id} status={status}")
+        return
+    stop_at_deadline(client, args.pod_id, args.after_minutes,
+                     args.interval_seconds)
+
+
+if __name__ == "__main__":
+    main()
