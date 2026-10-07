@@ -89,8 +89,9 @@ done
   - WS=4: accuracy **0.10**, thrash 0.59, 22 of 40 tasks hit the step limit,
     about 1 note per task.
 
-  An untrained model collapses under a tight working set because it doesn't
-  keep notes. The reference processor at WS=4 scores 1.00. See
+  The untrained model's collapse coincides with sparse notes and high
+  re-fetching; the reference processor at WS=4 scores 1.00. The model
+  comparison does not isolate notes as the sole cause. See
   `RESULTS_V1.md`.
 - **Pending:** a baseline for the open model that will actually be fine-tuned
   (M3). It needs a served endpoint (vLLM).
@@ -504,12 +505,16 @@ same held-out tasks. This is a separate arm, after the M3/M4 baseline.
 
 Let the model replace or edit a bounded workspace document instead of only
 appending key-value notes. Keep runtime facts and citations immutable and
-outside that document. Run a zero-shot DeepSeek comparison at working sets of
-4 and 32 on identical seeded tasks, measuring answer accuracy, re-fetch
-thrash, writes, prompt tokens, steps, and cost. Start with a small sample that
-fits the remaining DeepSeek credit; increase sample size only if the result is
-promising and the budget allows. This experiment can run independently of
-M3 training.
+outside that document. This is inspired by CLM, but it edits only CVM's
+reasoning workspace rather than the model's entire context. Run a zero-shot
+DeepSeek comparison at working sets of 4 and 32 on identical seeded tasks,
+with the same model, step limit, and prompt budget as the key-value notes arm.
+Measure answer accuracy, re-fetch thrash, writes, prompt tokens, steps, and
+cost. Start with a small sample that fits the remaining DeepSeek credit;
+increase sample size only if the result is promising and the budget allows.
+The published zero-shot CLM results do not imply this smaller workspace or
+this model will improve: test it directly. This experiment can run
+independently of M3 training.
 
 ## 3. Risks and how the plan handles them
 

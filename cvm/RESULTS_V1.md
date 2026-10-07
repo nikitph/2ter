@@ -92,16 +92,18 @@ seeded tasks. Intervals are 95%. Files:
    - more than half the tasks run out of steps.
 
    The reference processor, in the same 4-object cell on the same world,
-   scores 1.00 with zero thrash. The difference is entirely **notes**: the
-   model wrote about 1 per task whether it had 32 objects or 4, so evicted
-   state was simply lost. This is V0's notes ablation, reproduced with a live
-   model.
-3. **This is the clearest target for V1.** Collapsing from 0.68 to 0.10 isn't
-   a reasoning deficit; it's one missing habit: write down what you'll need
-   before it's evicted. The reference processor shows the habit is enough
-   by itself (1.00 at 4 objects). That makes it the first thing M1's training
-   data must teach, and the `tight` split in M2 is the test that it was
-   learned.
+   scores 1.00 with zero thrash. The live model wrote about 1 note per task
+   whether it had 32 objects or 4. Underusing notes is a strong explanation
+   for repeated fetches, but this comparison does not isolate notes: the
+   reference processor also differs in planning and answer selection. A
+   controlled notes intervention on the same model is needed to measure the
+   causal contribution.
+3. **This is the clearest target for V1.** The repeated fetches point to a
+   missing habit: write down what you'll need before it's evicted. The
+   reference processor demonstrates that a policy using notes can solve these
+   tasks at 4 objects. M1 teaches that policy, and M2's `tight` split checks
+   whether the trained model improves. The improvement must still be measured
+   against the same model and task seeds.
 4. **Thrash is worse than it looks.** The model faulted more (31 vs 18 per
    task) and fetched mostly relevant objects (fault precision 0.54). It knew
    what it needed, kept losing it, and fetched it again. That matches the
