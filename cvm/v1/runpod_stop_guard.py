@@ -49,6 +49,10 @@ class RunpodCli:
             raise RuntimeError(f"pod {pod_id} is absent from runpodctl pod list --all")
         runtime = str(pod.get("runtimeStatus") or "").upper()
         desired = str(pod.get("desiredStatus") or pod.get("status") or "").upper()
+        # The two Runpod surfaces may briefly disagree. A desired RUNNING pod
+        # still needs a stop request even if runtime telemetry says stopped.
+        if desired == "RUNNING" and runtime in STOPPED:
+            return "INITIALIZING"
         return runtime if runtime and runtime != "UNKNOWN" else desired
 
     def stop(self, pod_id: str) -> None:

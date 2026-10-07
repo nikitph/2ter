@@ -55,6 +55,13 @@ class RunpodGuardTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "absent"):
                 cli.status("pod-1")
 
+    def test_cli_keeps_guard_armed_when_desired_running_disagrees(self):
+        cli = RunpodCli(Path("/usr/local/bin/runpodctl"))
+        output = '[{"id":"pod-1","runtimeStatus":"stopped","desiredStatus":"RUNNING"}]'
+        with patch("v1.runpod_stop_guard.subprocess.run",
+                   return_value=CompletedProcess([], 0, output, "")):
+            self.assertEqual(cli.status("pod-1"), "INITIALIZING")
+
     def test_stops_only_after_deadline_and_confirms_state(self):
         clock = FakeClock()
         pod = FakePod()
