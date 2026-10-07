@@ -93,3 +93,14 @@ earlier, stop the pod immediately through Runpod and verify it is no longer
 RUNNING. The guard is a fallback if the Codex session is interrupted. The
 volume persists after the pod stops; retain it until checkpoints are copied
 or further training is complete.
+
+## Interrupted model evaluations
+
+Run `experiments/run_llm.py` with a separate `--tag` for each base or adapter
+cell and write `--out-dir` to `/workspace/cvm-v1-full/eval/`. It journals each
+completed task to `llm_<tag>_progress.jsonl` with an `fsync`. Rerun an
+interrupted cell with the same arguments plus `--resume`; it skips saved tasks
+and rebuilds the summary and traces. The runner refuses changed run settings
+or accidental overwrite of an existing journal. Copy the final summary and
+traces into the repository's `results/` directory and commit them before
+deleting the network volume.

@@ -4,9 +4,10 @@
         --sizes 1000,1000000 --tasks 30 --conditions cvm,agent --workers 8
 
 Each CVM step is one stateless API call: the prompt is the whole state.
-Writes <out-dir>/llm_<tag>.json (summary + per-run metrics) and
-<out-dir>/llm_<tag>_traces.jsonl (operation trace of every run); out-dir defaults
-to results/. --max-objects sets the CVM working-set size (default 32).
+Writes <out-dir>/llm_<tag>.json (summary + per-run metrics),
+<out-dir>/llm_<tag>_traces.jsonl (operation traces), and a durable per-task
+progress journal. Pass --resume with the same tag and run settings after an
+interruption. --max-objects sets the CVM working-set size (default 32).
 """
 from __future__ import annotations
 
@@ -15,7 +16,8 @@ import json
 import os
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -55,6 +57,36 @@ def accuracy_by(runs: list[dict], key: str) -> dict:
     return out
 
 
+def load_progress(path: Path, config: dict) -> dict[tuple[int, str, int], dict]:
+    """Read complete journal records, discarding only a torn final line."""
+    records = {}
+    with path.open("r+b") as source:
+        header = source.readline()
+        if not header.endswith(b"\n") or json.loads(header) != {"schema": 1, "config": config}:
+            raise ValueError(f"progress settings differ or header is damaged: {path}")
+        while True:
+            offset = source.tell()
+            line = source.readline()
+            if not line:
+                break
+            if not line.endswith(b"\n"):
+                source.truncate(offset)
+                break
+            record = json.loads(line)
+            key = (record["cell_index"], record["condition"], record["task_index"])
+            if key in records:
+                raise ValueError(f"duplicate progress record {key} in {path}")
+            records[key] = record
+    return records
+
+
+def append_progress(path: Path, record: dict) -> None:
+    with path.open("a") as stream:
+        stream.write(json.dumps(record, default=str) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--provider", default="deepseek")
@@ -75,6 +107,8 @@ def main(argv=None):
     ap.add_argument("--full-context-limit", type=int, default=128_000,
                     help="model window for the one-step full-context baseline")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--resume", action="store_true",
+                    help="continue a run from its per-task progress journal")
     ap.add_argument("--hint", action="store_true", help="add the investigation-method hint")
     ap.add_argument("--base-url", default="https://api.deepseek.com",
                     help="OpenAI-compatible endpoint, e.g. http://localhost:8000/v1 for vLLM")
@@ -97,7 +131,21 @@ def main(argv=None):
               "tasks_per_size": args.tasks, "max_steps": args.max_steps,
               "max_objects": args.max_objects, "split": args.split, "sizes": []}
     os.makedirs(args.out_dir, exist_ok=True)
-    traces = open(os.path.join(args.out_dir, f"llm_{tag}_traces.jsonl"), "w")
+    progress_path = Path(args.out_dir) / f"llm_{tag}_progress.jsonl"
+    config = {key: value for key, value in vars(args).items()
+              if key not in ("workers", "out_dir", "tag", "resume")}
+    if args.resume:
+        if not progress_path.is_file():
+            ap.error(f"no progress journal to resume: {progress_path}")
+        completed = load_progress(progress_path, config)
+    else:
+        if progress_path.exists():
+            ap.error(f"progress journal already exists: {progress_path}; use --resume or a new --tag")
+        completed = {}
+        progress_path.touch()
+        append_progress(progress_path, {"schema": 1, "config": config})
+    traces_path = Path(args.out_dir) / f"llm_{tag}_traces.jsonl"
+    traces_path.write_text("")
     cells = cells_for(args.split) if args.split else (None,) * len(args.sizes.split(","))
     sizes = [int(x) for x in args.sizes.split(",")] if not args.split else []
     for i, cell in enumerate(cells):
@@ -118,6 +166,12 @@ def main(argv=None):
         for cond in conditions:
             t0 = time.time()
             full = FullContext(store, w.n_objects, context_limit=args.full_context_limit) if cond == "full" else None
+
+            for j, spec in enumerate(tasks):
+                saved = completed.get((i, cond, j))
+                if saved and (saved["task"] != spec.task.text or
+                              saved["expected"] != spec.expected):
+                    raise ValueError(f"progress task mismatch at cell {i}, {cond}, task {j}")
 
             def one(spec):
                 proc = make_processor(args, domain)
@@ -143,12 +197,31 @@ def main(argv=None):
                            "answer": m["answer"], "support": list(c.answer_support) if c else [],
                            "trace": list(c.trace) if c else [], "notes": dict(c.notes) if c else {}}
 
+            missing = [(j, spec) for j, spec in enumerate(tasks)
+                       if (i, cond, j) not in completed]
+            errors = []
             with ThreadPoolExecutor(1 if cond == "full" else args.workers) as ex:
-                results = list(ex.map(one, tasks))
+                futures = {ex.submit(one, spec): (j, spec) for j, spec in missing}
+                for future in as_completed(futures):
+                    j, spec = futures[future]
+                    try:
+                        metrics, trace = future.result()
+                    except Exception as exc:
+                        errors.append(exc)
+                        continue
+                    record = {"cell_index": i, "condition": cond, "task_index": j,
+                              "task": spec.task.text, "expected": spec.expected,
+                              "metrics": metrics, "trace": trace}
+                    append_progress(progress_path, record)
+                    completed[(i, cond, j)] = record
+            if errors:
+                raise errors[0]
+            records = [completed[(i, cond, j)] for j in range(len(tasks))]
+            results = [(record["metrics"], record["trace"]) for record in records]
             runs = [m for m, _ in results]
-            for _, tr in results:
-                traces.write(json.dumps(tr) + "\n")
-            traces.flush()
+            with traces_path.open("a") as traces:
+                for _, tr in results:
+                    traces.write(json.dumps(tr) + "\n")
             s = summarize(runs)
             s.update({
                 "llm_input_tokens_mean": sum(r["llm_input_tokens"] for r in runs) / len(runs),
@@ -175,10 +248,12 @@ def main(argv=None):
                   f"stepLimit={s['step_limit']} aborted={s['aborted']} overflow={s['context_overflow']} "
                   f"in_tok={s['llm_input_tokens_mean']:.0f} ({s['wall_seconds']}s)", flush=True)
         report["sizes"].append(entry)
-        with open(os.path.join(args.out_dir, f"llm_{tag}.json"), "w") as f:
+        report_path = Path(args.out_dir) / f"llm_{tag}.json"
+        temp_path = report_path.with_suffix(".json.tmp")
+        with temp_path.open("w") as f:
             json.dump(report, f, indent=1, default=str)
+        os.replace(temp_path, report_path)
         store.db.close()
-    traces.close()
 
 
 if __name__ == "__main__":

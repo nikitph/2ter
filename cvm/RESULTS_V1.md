@@ -221,3 +221,13 @@ the last live training step observed was 48. The status of later checkpoints
 and the second training segment's final metrics cannot be verified until the
 volume is mounted again. No GPU pod was running at the time of this check.
 The machine-readable audit is `results/v1_runpod_segment_2026-10-06.json`.
+
+## M4: Evaluation runner readiness
+
+The runner now writes a durable record after each completed task. An
+interrupted reference-provider test resumed the unfinished task without
+repeating the three completed tasks, rebuilt all four traces and the summary,
+and recovered from a deliberately truncated final journal line. A second
+test rejected a resume with changed task settings. The full local suite
+passed 39 tests. Model-level M4 cells are still pending a served base model
+and the saved adapter on a GPU.

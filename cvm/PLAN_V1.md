@@ -305,6 +305,11 @@ for split in iid scale deep traps tight domain2; do
 done
 ```
 
+The runner writes a per-task `llm_<tag>_progress.jsonl` journal. If a pod
+stops during a cell, rerun the same command with `--resume`; completed tasks
+are reused, and the report and traces are rebuilt from the journal. Keep the
+journal and use a distinct tag for each model/split/condition.
+
 **Code needed:** `run_llm.py` needs a `--split` flag wired to M2, plus the
 `--max-objects` flag from M0. vLLM supports `response_format: json_object`;
 if your version doesn't, use guided JSON decoding.
