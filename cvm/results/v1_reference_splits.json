@@ -1,0 +1,128 @@
+[
+  {
+    "split": "iid",
+    "size": 1000,
+    "seed": 3000,
+    "domain": "incident",
+    "depth_range": [
+      1,
+      3
+    ],
+    "traps": false,
+    "max_objects": 32,
+    "world_objects": 1015,
+    "tasks": 100,
+    "correct": 100,
+    "step_limits": 0,
+    "peak_objects_max": 14,
+    "mean_steps": 30.5
+  },
+  {
+    "split": "iid",
+    "size": 1000000,
+    "seed": 3000,
+    "domain": "incident",
+    "depth_range": [
+      1,
+      3
+    ],
+    "traps": false,
+    "max_objects": 32,
+    "world_objects": 999991,
+    "tasks": 100,
+    "correct": 100,
+    "step_limits": 0,
+    "peak_objects_max": 14,
+    "mean_steps": 30.56
+  },
+  {
+    "split": "scale",
+    "size": 1000000,
+    "seed": 3001,
+    "domain": "incident",
+    "depth_range": [
+      1,
+      3
+    ],
+    "traps": false,
+    "max_objects": 32,
+    "world_objects": 999991,
+    "tasks": 100,
+    "correct": 100,
+    "step_limits": 0,
+    "peak_objects_max": 14,
+    "mean_steps": 30.06
+  },
+  {
+    "split": "deep",
+    "size": 1000,
+    "seed": 3002,
+    "domain": "incident",
+    "depth_range": [
+      4,
+      5
+    ],
+    "traps": false,
+    "max_objects": 32,
+    "world_objects": 1219,
+    "tasks": 100,
+    "correct": 100,
+    "step_limits": 0,
+    "peak_objects_max": 16,
+    "mean_steps": 36.69
+  },
+  {
+    "split": "traps",
+    "size": 1000,
+    "seed": 3003,
+    "domain": "incident",
+    "depth_range": [
+      1,
+      3
+    ],
+    "traps": true,
+    "max_objects": 32,
+    "world_objects": 1103,
+    "tasks": 100,
+    "correct": 100,
+    "step_limits": 0,
+    "peak_objects_max": 16,
+    "mean_steps": 34.18
+  },
+  {
+    "split": "tight",
+    "size": 1000000,
+    "seed": 3004,
+    "domain": "incident",
+    "depth_range": [
+      1,
+      3
+    ],
+    "traps": false,
+    "max_objects": 4,
+    "world_objects": 999991,
+    "tasks": 100,
+    "correct": 100,
+    "step_limits": 0,
+    "peak_objects_max": 4,
+    "mean_steps": 30.83
+  },
+  {
+    "split": "domain2",
+    "size": 1000,
+    "seed": 4000,
+    "domain": "code",
+    "depth_range": [
+      1,
+      3
+    ],
+    "traps": false,
+    "max_objects": 32,
+    "world_objects": 999,
+    "tasks": 100,
+    "correct": 100,
+    "step_limits": 0,
+    "peak_objects_max": 9,
+    "mean_steps": 15.88
+  }
+]

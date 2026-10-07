@@ -92,16 +92,18 @@ seeded tasks. Intervals are 95%. Files:
    - more than half the tasks run out of steps.
 
    The reference processor, in the same 4-object cell on the same world,
-   scores 1.00 with zero thrash. The difference is entirely **notes**: the
-   model wrote about 1 per task whether it had 32 objects or 4, so evicted
-   state was simply lost. This is V0's notes ablation, reproduced with a live
-   model.
-3. **This is the clearest target for V1.** Collapsing from 0.68 to 0.10 isn't
-   a reasoning deficit; it's one missing habit: write down what you'll need
-   before it's evicted. The reference processor shows the habit is enough
-   by itself (1.00 at 4 objects). That makes it the first thing M1's training
-   data must teach, and the `tight` split in M2 is the test that it was
-   learned.
+   scores 1.00 with zero thrash. The live model wrote about 1 note per task
+   whether it had 32 objects or 4. Underusing notes is a strong explanation
+   for repeated fetches, but this comparison does not isolate notes: the
+   reference processor also differs in planning and answer selection. A
+   controlled notes intervention on the same model is needed to measure the
+   causal contribution.
+3. **This is the clearest target for V1.** The repeated fetches point to a
+   missing habit: write down what you'll need before it's evicted. The
+   reference processor demonstrates that a policy using notes can solve these
+   tasks at 4 objects. M1 teaches that policy, and M2's `tight` split checks
+   whether the trained model improves. The improvement must still be measured
+   against the same model and task seeds.
 4. **Thrash is worse than it looks.** The model faulted more (31 vs 18 per
    task) and fetched mostly relevant objects (fault precision 0.54). It knew
    what it needed, kept losing it, and fetched it again. That matches the
@@ -132,3 +134,138 @@ the runtime, check the answer, and verify exported actions and split seeds.
 
 The generated `data/v1/` files are ignored by Git (about 1.9 GB). They can be
 regenerated with the command above. This dataset is ready for model training. The open-model baseline remains pending.
+
+## M2: Held-out split reference checks
+
+`python3 experiments/v1_splits.py --tasks 100` passed all cells. The machine-
+readable output is `results/v1_reference_splits.json`.
+
+| Split | World objects | Working set | Correct | Step limits |
+|---|---:|---:|---:|---:|
+| iid (10³) | 1,015 | 32 | 100/100 | 0 |
+| iid (10⁶) | 999,991 | 32 | 100/100 | 0 |
+| scale | 999,991 | 32 | 100/100 | 0 |
+| deep (depth 4–5) | 1,219 | 32 | 100/100 | 0 |
+| traps | 1,103 | 32 | 100/100 | 0 |
+| tight | 999,991 | 4 | 100/100 | 0 |
+| domain2 (code repositories) | 999 | 32 | 100/100 | 0 |
+
+The code-repository world has a separate prompt-only `CodeReferenceReasoner`
+for this solvability check. It is never used to create M1 training examples.
+The `full` condition in `run_llm.py` also passed a three-task reference smoke
+test at 10³ objects (one step each), and marked all three tasks infeasible
+when its model-window limit was set below the estimated prompt length.
+
+## M3: A100 training sanity check
+
+On a Runpod A100 SXM4 80 GB in EU-RO-1, the Qwen2.5-7B-Instruct LoRA script
+completed two optimizer steps, saved checkpoints, evaluated held-out prompts,
+and resumed from checkpoint 2 to complete step 4. The first evaluation
+generated valid JSON on 16/16 prompts and chose the right operation on 4/16;
+the resumed evaluation generated valid JSON on 4/4 and chose the right
+operation on 1/4. These tiny, partially trained evaluations check the
+pipeline only; they are not model performance estimates.
+
+The full exported dataset was copied to the persistent volume and all three
+file SHA-256 hashes matched the local files. The 100,000-example run saves
+every two optimizer steps and evaluates loss every ten steps. Machine-readable
+pilot details: `results/v1_a100_sanity.json`.
+
+The first ten full-size optimizer steps took 8 minutes 34 seconds including
+one 256-example evaluation (53 seconds). GPU memory reached about 51 GB and
+the first held-out loss was 0.704. If this early rate holds, 1,563 steps
+(one epoch) would take roughly 22 GPU hours, about $35 at the selected
+$1.59/hour rate, plus startup and storage. This is an estimate, not a
+completed-run measurement; the initial $10 balance cannot cover an epoch.
+
+**First action-level gate, checkpoint 34.** Held-out loss fell from 0.704 at
+step 10 to 0.192 at step 20 and 0.042 at step 30. The training process was
+paused after a complete checkpoint 34 to score 256 held-out prompts:
+
+| Metric | Result |
+|---|---:|
+| Valid JSON | 252/256 (98.4%) |
+| Correct operation | 229/256 (89.5%) |
+| Exact action | 206/256 (80.5%) |
+
+This is below M3's 95% operation target, so training resumed from checkpoint
+34 with the original one-epoch schedule. The exact result is
+`results/v1_adapter_val_step34.json`. This gate measures individual actions;
+full held-out task accuracy remains unmeasured until M4.
+
+**Second action-level gate, checkpoint 40.** After resuming from 34, held-out
+loss fell to 0.012 at step 40. The same 256-prompt validation sample scored
+255/256 valid JSON, 244/256 correct operations (**95.3%**), and 233/256 exact
+actions (91.0%). The operation breakdown matters:
+
+| Expected operation | Correct operation |
+|---|---:|
+| WRITE | 110/110 |
+| FAULT | 62/63 |
+| TRAVERSE | 61/62 |
+| EVIDENCE | 3/3 |
+| ANSWER | 7/8 |
+| SEARCH | **1/10** |
+
+The aggregate M3 operation target is met on this sample, but SEARCH remains
+weak, so training resumed from checkpoint 40. The detailed result is
+`results/v1_adapter_val_step40.json`. A larger, operation-stratified check
+and task-level M4 runs are needed before treating the adapter as ready.
+
+**Runpod budget stop.** At 2026-10-07 01:46 UTC, Runpod reported no pod and
+`get_pod` returned 404. The 50 GB network volume still existed in EU-RO-1.
+The billing API showed $10.001 GPU, $0.026 pod disk, and $0.029 network
+volume charges ($10.056 total). The pod was not stopped before the available
+credit was consumed. The last checkpoint inspected over SSH was step 40, and
+the last live training step observed was 48. The status of later checkpoints
+and the second training segment's final metrics cannot be verified until the
+volume is mounted again. No GPU pod was running at the time of this check.
+The machine-readable audit is `results/v1_runpod_segment_2026-10-06.json`.
+The action evaluator now accepts a complete Trainer checkpoint directly if
+the interrupted run did not save a final adapter directory; it loads the
+base-model tokenizer recorded in the checkpoint's PEFT config.
+
+**Recovered training result, checkpoint 203.** On 2026-10-07 the retained
+volume was remounted. The previous segment had completed step 203 of 1,563
+and saved both a complete Trainer checkpoint and a final adapter with identical
+weight hashes. Its lowest recorded validation loss was 0.000964 at step 180;
+the final 32-prompt diagnostic was 32/32 exact but contained no SEARCH cases.
+On the same 256 held-out action prompts used for checkpoint 40, checkpoint
+203 produced 255/256 valid JSON, **253/256 correct operations (98.8%)**, and
+**252/256 exact actions (98.4%)**. SEARCH improved to 9/10. The raw outputs
+are `results/v1_train_step203_metrics.json` and
+`results/v1_adapter_val_step203.json`. This is action-level evidence only;
+the full base-versus-adapter task-level comparison remains pending.
+An operation-stratified check on another 128 held-out prompts scored
+**67/69 SEARCH** and **56/59 ANSWER** exactly, with 123/128 operations correct
+overall (`results/v1_adapter_val_step203_search_answer.json`).
+
+## M4: Evaluation runner readiness
+
+The runner now writes a durable record after each completed task. An
+interrupted reference-provider test resumed the unfinished task without
+repeating the three completed tasks, rebuilt all four traces and the summary,
+and recovered from a deliberately truncated final journal line. A second
+test rejected a resume with changed task settings. The serving preflight also
+identified two configuration requirements: the rank-32 adapter needs
+`--max-lora-rank 32` (vLLM defaults to 16), and a bounded response allowance
+is needed with an 8192-token server window. `run_llm.py` now records and
+applies `--max-output-tokens`; the M4 command uses 512. The full local suite
+passed 41 tests. Full model-level M4 cells are still pending.
+
+**Paired serving pilot (n=1).** On 2026-10-07, Qwen2.5-7B-Instruct and the
+step-203 adapter were served together on an RTX 5090 in EU-RO-1. Both ran the
+same held-out `tight` task at 999,991 world objects with a 4-object cap:
+
+| Pilot model | Correct | Steps | Notes written | Thrash | Peak resident |
+|---|---:|---:|---:|---:|---:|
+| Base | 0/1 | 60 (limit) | 0 | 0 | 1 |
+| Step-203 adapter | 1/1 | 30 | 12 | 0 | 4 |
+
+The adapter solved the root-cause task; the base model repeatedly traversed,
+never faulted an object, and reached the step limit. This is a serving and
+runner sanity check, **not an accuracy estimate**. Each model's summary,
+journal, and trace file is committed under `results/` with the
+`llm_v1-base-tight-smoke1` or `llm_v1-sft-step203-tight-smoke1` prefix.
+The evaluation pod `p22y9tr1qpmhlp` was stopped and confirmed `stopped`;
+the checkpoint volume remains available for larger cells.

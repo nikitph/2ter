@@ -89,8 +89,9 @@ done
   - WS=4: accuracy **0.10**, thrash 0.59, 22 of 40 tasks hit the step limit,
     about 1 note per task.
 
-  An untrained model collapses under a tight working set because it doesn't
-  keep notes. The reference processor at WS=4 scores 1.00. See
+  The untrained model's collapse coincides with sparse notes and high
+  re-fetching; the reference processor at WS=4 scores 1.00. The model
+  comparison does not isolate notes as the sole cause. See
   `RESULTS_V1.md`.
 - **Pending:** a baseline for the open model that will actually be fine-tuned
   (M3). It needs a served endpoint (vLLM).
@@ -295,14 +296,30 @@ accuracy on `val.jsonl` is ≥ 95%.
 ### M4: Serve and evaluate
 
 ```bash
-pip install vllm
-vllm serve <base-model> --enable-lora --lora-modules cvm=<path-to-adapter> --port 8000
+vllm serve Qwen/Qwen2.5-7B-Instruct --enable-lora --max-lora-rank 32 \
+  --lora-modules cvm=<path-to-adapter> --max-model-len 8192 \
+  --host 127.0.0.1 --port 8000
 export VLLM_KEY=local
 for split in iid scale deep traps tight domain2; do
   python experiments/run_llm.py --provider openai-compatible --base-url http://localhost:8000/v1 \
-     --api-key-env VLLM_KEY --model cvm --split $split --tasks 100 --tag v1-sft-$split
+     --api-key-env VLLM_KEY --model cvm --max-output-tokens 512 \
+     --split $split --tasks 100 --tag v1-sft-$split
 done
 ```
+
+Use a vLLM build compatible with the pod's CUDA driver, in a separate
+environment from the training dependencies. The adapter uses LoRA rank 32;
+vLLM's default maximum rank is 16, so `--max-lora-rank 32` is required.
+`--max-output-tokens 512` keeps the one-action response within the server's
+8192-token request window even when the CVM prompt is a few thousand tokens.
+Check `/v1/models` and run a distinct one-task pilot tag before the 100-task
+cells. Serve the base and adapter from the same engine to compare them on
+identical task seeds.
+
+The runner writes a per-task `llm_<tag>_progress.jsonl` journal. If a pod
+stops during a cell, rerun the same command with `--resume`; completed tasks
+are reused, and the report and traces are rebuilt from the journal. Keep the
+journal and use a distinct tag for each model/split/condition.
 
 **Code needed:** `run_llm.py` needs a `--split` flag wired to M2, plus the
 `--max-objects` flag from M0. vLLM supports `response_format: json_object`;
@@ -490,6 +507,31 @@ models and M6's recursion):
 **Done when:** `RESULTS_V1.md` has the chain-accuracy-vs-depth chart for the
 three arms, plus decoy catch rates and the routing cost/accuracy table.
 
+### M8 (proposed): Programmatic mode
+
+Add an `EXEC` operation for a sandboxed `cvm` API that can batch bounded
+`traverse`, `fault`, and `search` calls. Map recursive `llm_query` calls to
+M6 child contexts with narrower capabilities. Limit execution time, memory,
+returned bytes, tool calls, and recursion depth; all materialized facts still
+enter the immutable ledger with provenance. Compare accuracy, total tokens,
+wall time, and model steps against the one-operation-per-step runtime on the
+same held-out tasks. This is a separate arm, after the M3/M4 baseline.
+
+### M9 (proposed): Editable workspace notes
+
+Let the model replace or edit a bounded workspace document instead of only
+appending key-value notes. Keep runtime facts and citations immutable and
+outside that document. This is inspired by CLM, but it edits only CVM's
+reasoning workspace rather than the model's entire context. Run a zero-shot
+DeepSeek comparison at working sets of 4 and 32 on identical seeded tasks,
+with the same model, step limit, and prompt budget as the key-value notes arm.
+Measure answer accuracy, re-fetch thrash, writes, prompt tokens, steps, and
+cost. Start with a small sample that fits the remaining DeepSeek credit;
+increase sample size only if the result is promising and the budget allows.
+The published zero-shot CLM results do not imply this smaller workspace or
+this model will improve: test it directly. This experiment can run
+independently of M3 training.
+
 ## 3. Risks and how the plan handles them
 
 | Risk | Mitigation |
@@ -528,7 +570,7 @@ fine-tuning service.
 |---|---|
 | M0 baselines via hosted API (e.g. DeepSeek-Flash, 100 tasks × 2 WS sizes) | ~$8–10 (V0 measured ~$0.04/task) |
 | M1–M2 data generation | $0 (CPU, minutes) |
-| M3 LoRA SFT, 7–8B, ~200M tokens, 1×H100 | a few GPU-hours (tens of dollars on rented GPUs) |
+| M3 LoRA SFT, Qwen2.5-7B, 100k examples, 1×A100 SXM4 80 GB | early 10-step rate projects ~22 GPU-hours, ~$35 at $1.59/hour, plus setup and storage; checkpoint and resume across budgeted segments |
 | M4 eval, self-hosted vLLM | GPU time only |
 | M5 RL (optional) | 5–20× the SFT compute |
 | M7 Jev checker | ~$0.003 per 30-step task (at the reported $0.042 per million input tokens) |
@@ -550,10 +592,12 @@ fine-tuning service.
 - [x] M0 (DeepSeek-V4.1-Flash): WS=32 → 0.68, WS=4 → 0.10 (thrash 0.59), n=40 per cell
 - [ ] M0 (fine-tune base model): WS=32 and WS=4 on 10⁶ — needs a served endpoint
 - [ ] M0b: `full` condition in `run_llm.py`; small vs 7–8B model × {plain, hint} × {WS=32, WS=4} at 10⁶, plus same small model without CVM at 10³
-- [ ] M1: `export_trajectories.py` + replay test + `data/v1/{train,val}.jsonl`
-- [ ] M2: `depth_range`, `traps`, `tight`, `domain2` (`synthetic_code_world.py` + `CodeReferenceReasoner`, validation only); reference = 1.00 on all splits
+- [x] M1: `export_trajectories.py` + replay test + `data/v1/{train,val}.jsonl`
+- [x] M2: `depth_range`, `traps`, `tight`, `domain2` (`synthetic_code_world.py` + `CodeReferenceReasoner`, validation only); reference = 1.00 on all splits
 - [ ] M3: `v1/train_lora.py`, `v1/requirements.txt`; adapter with ≥95% op accuracy on val
 - [ ] M4: `--split` flag; eval matrix; `RESULTS_V1.md` with charts
 - [ ] M5 (optional): RL refinement if SFT plateaus
 - [ ] M6 (proposed): `CALL` op for recursive child contexts; small model with/without recursion
 - [ ] M7: `checkers.py` (JevChecker + TrainedCritic), runtime hook, exporter negatives, `--checker`/`--escalate-to`; chain accuracy vs depth, decoy catch rate, routing table
+- [ ] M8 (proposed): sandboxed `EXEC` over the CVM API with batched operations and M6 child calls
+- [ ] M9 (proposed): editable bounded workspace notes, zero-shot DeepSeek WS=4/32 comparison

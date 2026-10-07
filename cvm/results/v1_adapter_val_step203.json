@@ -1,0 +1,74 @@
+{
+  "examples": 256,
+  "json_valid": 255,
+  "op_correct": 253,
+  "action_exact": 252,
+  "by_expected_op": {
+    "WRITE": {
+      "examples": 110,
+      "json_valid": 110,
+      "op_correct": 110,
+      "action_exact": 110,
+      "json_valid_rate": 1.0,
+      "op_correct_rate": 1.0,
+      "action_exact_rate": 1.0
+    },
+    "FAULT": {
+      "examples": 63,
+      "json_valid": 63,
+      "op_correct": 62,
+      "action_exact": 62,
+      "json_valid_rate": 1.0,
+      "op_correct_rate": 0.9841269841269841,
+      "action_exact_rate": 0.9841269841269841
+    },
+    "TRAVERSE": {
+      "examples": 62,
+      "json_valid": 62,
+      "op_correct": 62,
+      "action_exact": 61,
+      "json_valid_rate": 1.0,
+      "op_correct_rate": 1.0,
+      "action_exact_rate": 0.9838709677419355
+    },
+    "EVIDENCE": {
+      "examples": 3,
+      "json_valid": 3,
+      "op_correct": 3,
+      "action_exact": 3,
+      "json_valid_rate": 1.0,
+      "op_correct_rate": 1.0,
+      "action_exact_rate": 1.0
+    },
+    "ANSWER": {
+      "examples": 8,
+      "json_valid": 7,
+      "op_correct": 7,
+      "action_exact": 7,
+      "json_valid_rate": 0.875,
+      "op_correct_rate": 0.875,
+      "action_exact_rate": 0.875
+    },
+    "SEARCH": {
+      "examples": 10,
+      "json_valid": 10,
+      "op_correct": 9,
+      "action_exact": 9,
+      "json_valid_rate": 1.0,
+      "op_correct_rate": 0.9,
+      "action_exact_rate": 0.9
+    }
+  },
+  "json_valid_rate": 0.99609375,
+  "op_correct_rate": 0.98828125,
+  "action_exact_rate": 0.984375,
+  "adapter_dir": "/workspace/cvm-v1-full/train/checkpoints/checkpoint-203",
+  "tokenizer_source": "/workspace/cvm-v1-full/train/checkpoints/checkpoint-203",
+  "validation_world_seeds": [
+    2000,
+    2001,
+    2002,
+    2003
+  ],
+  "expected_ops_filter": null
+}

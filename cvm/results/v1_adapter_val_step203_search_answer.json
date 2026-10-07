@@ -1,0 +1,41 @@
+{
+  "examples": 128,
+  "json_valid": 125,
+  "op_correct": 123,
+  "action_exact": 123,
+  "by_expected_op": {
+    "ANSWER": {
+      "examples": 59,
+      "json_valid": 56,
+      "op_correct": 56,
+      "action_exact": 56,
+      "json_valid_rate": 0.9491525423728814,
+      "op_correct_rate": 0.9491525423728814,
+      "action_exact_rate": 0.9491525423728814
+    },
+    "SEARCH": {
+      "examples": 69,
+      "json_valid": 69,
+      "op_correct": 67,
+      "action_exact": 67,
+      "json_valid_rate": 1.0,
+      "op_correct_rate": 0.9710144927536232,
+      "action_exact_rate": 0.9710144927536232
+    }
+  },
+  "json_valid_rate": 0.9765625,
+  "op_correct_rate": 0.9609375,
+  "action_exact_rate": 0.9609375,
+  "adapter_dir": "/workspace/cvm-v1-full/train/checkpoints/checkpoint-203",
+  "tokenizer_source": "/workspace/cvm-v1-full/train/checkpoints/checkpoint-203",
+  "validation_world_seeds": [
+    2000,
+    2001,
+    2002,
+    2003
+  ],
+  "expected_ops_filter": [
+    "ANSWER",
+    "SEARCH"
+  ]
+}

@@ -1,0 +1,5 @@
+transformers>=4.52,<5
+trl>=0.23,<1
+peft>=0.17,<1
+datasets>=3,<5
+accelerate>=1,<2

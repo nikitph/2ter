@@ -1,0 +1,56 @@
+{
+  "date_utc": "2026-10-06",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "cloud": "Runpod Secure Cloud, EU-RO-1",
+  "price_usd_per_hour": 1.59,
+  "base_model": "Qwen/Qwen2.5-7B-Instruct",
+  "software": {
+    "torch": "2.8.0+cu128",
+    "transformers": "4.57.6",
+    "trl": "0.29.1",
+    "peft": "0.21.2",
+    "datasets": "4.8.5",
+    "accelerate": "1.15.0"
+  },
+  "pilot": {
+    "train_examples": 512,
+    "val_examples": 64,
+    "gradient_accumulation": 4,
+    "max_length": 4096,
+    "stage_one_steps": 2,
+    "stage_two_steps": 4,
+    "results": [
+      {
+        "examples": 16,
+        "json_valid": 16,
+        "op_correct": 4,
+        "action_exact": 0,
+        "json_valid_rate": 1.0,
+        "op_correct_rate": 0.25,
+        "action_exact_rate": 0.0,
+        "global_step": null,
+        "resumed_from_checkpoint": null
+      },
+      {
+        "examples": 4,
+        "json_valid": 4,
+        "op_correct": 1,
+        "action_exact": 0,
+        "json_valid_rate": 1.0,
+        "op_correct_rate": 0.25,
+        "action_exact_rate": 0.0,
+        "global_step": 4,
+        "resumed_from_checkpoint": "/workspace/cvm-pilot/train/checkpoints/checkpoint-2"
+      }
+    ]
+  },
+  "checks": {
+    "cuda_available": true,
+    "remote_export_valid": true,
+    "resume_from_checkpoint_2_to_4": true,
+    "full_dataset_sha256_match": true,
+    "full_train_rows": 254147,
+    "full_val_rows": 50897
+  },
+  "interpretation": "Training, evaluation, checkpoint saving, and resume passed. Operation accuracy after four optimizer steps is only a pipeline check, not a trained-model result."
+}

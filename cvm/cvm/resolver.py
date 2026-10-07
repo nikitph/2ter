@@ -69,8 +69,7 @@ class GraphStore:
         return [r for (r,) in self._q(sql.format(ns=""), (match, k))]
 
     def truth(self) -> list[dict]:
-        cols = ["cluster", "incident", "depth", "affected", "root", "cause", "owner",
-                "claim_true", "claim_false", "useful"]
+        cols = [row[1] for row in self._q("PRAGMA table_info(truth)")]
         out = []
         for row in self._q("SELECT * FROM truth ORDER BY cluster"):
             d = dict(zip(cols, row))
@@ -246,4 +245,10 @@ def default_mounts(store: GraphStore, cache: L2Cache) -> MountTable:
         NamespaceMount("metrics://", MetricsResolver(store, cache)),
         NamespaceMount("incident://", IncidentResolver(store, cache)),
         NamespaceMount("claim://", EvidenceResolver(store, cache)),
+        NamespaceMount("repo://", Resolver(store, cache)),
+        NamespaceMount("file://", Resolver(store, cache)),
+        NamespaceMount("symbol://", Resolver(store, cache)),
+        NamespaceMount("commit://", Resolver(store, cache)),
+        NamespaceMount("test://", Resolver(store, cache)),
+        NamespaceMount("bug://", Resolver(store, cache)),
     ])

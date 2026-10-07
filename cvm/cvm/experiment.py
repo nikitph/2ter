@@ -13,7 +13,7 @@ import random
 import time
 from dataclasses import dataclass
 
-from .context import CognitiveContext, Task, incident_agent_capabilities
+from .context import CognitiveContext, Task, code_agent_capabilities, incident_agent_capabilities
 from .objects import approx_tokens
 from .resolver import GraphStore, L2Cache
 from .runtime import CVMRuntime, RuntimeConfig
@@ -31,12 +31,23 @@ class TaskSpec:
     depth: int
 
 
-def make_tasks(store: GraphStore, n: int, seed: int = 0) -> list[TaskSpec]:
+def make_tasks(store: GraphStore, n: int, seed: int = 0,
+               domain: str = "incident") -> list[TaskSpec]:
+    if domain not in ("incident", "code"):
+        raise ValueError(f"unknown task domain: {domain}")
     truth = store.truth()
     rng = random.Random(seed)
     picks = [truth[rng.randrange(len(truth))] for _ in range(n)]
     out = []
     for i, t in enumerate(picks):
+        if domain == "code":
+            bug = t["bug"]
+            task = Task(f"task://{i}", "code_cause",
+                        f"Which commit caused {bug}? Trace its failing test through the file "
+                        "import chain and compare commits with the first failure time.",
+                        bug, [bug])
+            out.append(TaskSpec(task, t["cause"], set(t["useful"]), t["depth"]))
+            continue
         kind = ("root_cause", "owner", "claim")[i % 3]
         inc = t["incident"]
         useful = set(t["useful"])
@@ -117,8 +128,10 @@ def run_cvm(store, spec: TaskSpec, processor, world_size: int, max_objects=32,
                     cache=cache or L2Cache())
     ops = ("READ", "TRAVERSE", "SEARCH", "FAULT", "EVIDENCE") + (("WRITE",) if write else ())
     ctx = CognitiveContext("agent://incident-debugger", spec.task,
-                           incident_agent_capabilities(search=search, write=write,
-                                                       claims=spec.task.kind == "claim"),
+                           (code_agent_capabilities(search=search, write=write)
+                            if spec.task.kind == "code_cause" else
+                            incident_agent_capabilities(search=search, write=write,
+                                                        claims=spec.task.kind == "claim")),
                            WorkingSet(max_objects, max_tokens), available_ops=ops)
     io0 = store.io
     rt.run(ctx, processor)
@@ -134,8 +147,10 @@ def run_agent(store, spec: TaskSpec, processor, world_size: int,
                                          max_steps=max_steps),
                     cache=L2Cache())
     ctx = CognitiveContext("agent://tool-caller", spec.task,
-                           incident_agent_capabilities(write=False,
-                                                       claims=spec.task.kind == "claim"),
+                           (code_agent_capabilities(write=False)
+                            if spec.task.kind == "code_cause" else
+                            incident_agent_capabilities(write=False,
+                                                        claims=spec.task.kind == "claim")),
                            WorkingSet(INF, INF, max_handles=INF, full_render=True),
                            available_ops=("READ", "TRAVERSE", "SEARCH", "FAULT", "EVIDENCE"),
                            trace_window=None)
@@ -178,7 +193,8 @@ def run_rag(store, spec: TaskSpec, processor, world_size: int, k: int = 24,
 class FullContext:
     """Condition A. Materializes the entire world into one context (if it fits)."""
 
-    def __init__(self, store: GraphStore, world_size: int, sample: int = 2000):
+    def __init__(self, store: GraphStore, world_size: int, sample: int = 2000,
+                 context_limit: int = CONTEXT_LIMIT):
         self.store = store
         self.world_size = world_size
         self.rt = CVMRuntime(store, RuntimeConfig(), cache=L2Cache(enabled=False))
@@ -188,8 +204,11 @@ class FullContext:
         if refs is None:
             import sqlite3
             db = sqlite3.connect(store.path)
-            refs_sample = [r for (r,) in db.execute(
-                "SELECT ref FROM objects ORDER BY random() LIMIT ?", (sample,))]
+            try:
+                refs_sample = [r for (r,) in db.execute(
+                    "SELECT ref FROM objects ORDER BY random() LIMIT ?", (sample,))]
+            finally:
+                db.close()
         else:
             refs_sample = random.Random(0).sample(refs, min(sample, len(refs)))
         probe = CognitiveContext("probe", Task("t", "x", "", ""), incident_agent_capabilities(),
@@ -198,14 +217,20 @@ class FullContext:
             self.rt._materialize(probe, r, None)
         per = probe.working_set.object_tokens() / max(1, len(refs_sample))
         self.est_tokens = int(per * world_size)
-        self.feasible = self.est_tokens <= CONTEXT_LIMIT
+        self.feasible = self.est_tokens <= context_limit
         if self.feasible:
+            if refs is None:
+                refs = store.iter_objects()
             self.ctx = CognitiveContext("agent://full-context", Task("t", "x", "", ""),
                                         incident_agent_capabilities(),
                                         WorkingSet(INF, INF, max_handles=INF), available_ops=())
             for r in refs:
                 self.rt._materialize(self.ctx, r, None)
             self.base_prompt_tokens = approx_tokens(self.rt.build_prompt(self.ctx))
+            if self.base_prompt_tokens > context_limit:
+                self.feasible = False
+                self.est_tokens = self.base_prompt_tokens
+                self.ctx = None
 
     def run(self, spec: TaskSpec, processor) -> dict:
         if not self.feasible:
@@ -217,6 +242,7 @@ class FullContext:
                     "unsupported_answers": 0, "answers": 0}
         ctx = self.ctx
         ctx.task, ctx.state, ctx.answer = spec.task, "RUNNING", None
+        ctx.answer_support = []
         ctx.counters.clear(); ctx.prompt_tokens.clear(); ctx.trace.clear()
         ctx.last_result, ctx.peak_resident_tokens = "", 0
         rt = self.rt
