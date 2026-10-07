@@ -1,0 +1,99 @@
+{
+ "provider": "openai-compatible",
+ "model": "Qwen/Qwen2.5-7B-Instruct",
+ "method_hint": false,
+ "tasks_per_size": 1,
+ "max_steps": 60,
+ "max_objects": 32,
+ "max_output_tokens": 512,
+ "split": "tight",
+ "sizes": [
+  {
+   "world_objects": 999991,
+   "conditions": {
+    "cvm": {
+     "n": 1,
+     "accuracy": 0.0,
+     "peak_resident_objects_mean": 1.0,
+     "peak_resident_objects_max": 1,
+     "peak_prompt_tokens_mean": 619.0,
+     "peak_prompt_tokens_max": 619,
+     "total_prompt_tokens_mean": 36506.0,
+     "steps_mean": 60.0,
+     "objects_materialized_mean": 0.0,
+     "faults_mean": 0.0,
+     "searches_mean": 0.0,
+     "traversals_mean": 60.0,
+     "writes_mean": 0.0,
+     "unsupported_claim_rate": 0.0,
+     "external_io_mean": 62.0,
+     "latency_ms_mean": 21489.0,
+     "cognitive_locality_mean": 0.0,
+     "fault_precision_mean": 0.0,
+     "thrash_rate_mean": 0.0,
+     "virtualization_ratio_mean": 999991.0,
+     "infeasible": 0,
+     "context_overflow": 0,
+     "step_limit": 1,
+     "llm_input_tokens_mean": 82313.0,
+     "llm_output_tokens_mean": 1713.0,
+     "llm_calls_mean": 60.0,
+     "llm_errors": 0,
+     "invalid_ops_mean": 0.0,
+     "aborted": 0,
+     "abstained": 1,
+     "accuracy_by_kind": {
+      "root_cause": 0.0
+     },
+     "accuracy_by_depth": {
+      "1": 0.0
+     },
+     "wall_seconds": 21.6
+    }
+   },
+   "split": "tight",
+   "domain": "incident",
+   "max_objects": 4,
+   "runs": [
+    {
+     "condition": "D_cvm",
+     "world_size": 999991,
+     "task": "task://0",
+     "kind": "root_cause",
+     "depth": 1,
+     "correct": 0,
+     "answer": null,
+     "expected": "change://cart-k17487-cause",
+     "steps": 60,
+     "peak_resident_objects": 1,
+     "peak_prompt_tokens": 619,
+     "total_prompt_tokens": 36506,
+     "objects_materialized": 0,
+     "materializations": 0,
+     "faults": 0,
+     "searches": 0,
+     "traversals": 60,
+     "writes": 0,
+     "answers": 0,
+     "unsupported_answers": 0,
+     "capability_faults": 1,
+     "external_io": 62,
+     "latency_ms": 21489,
+     "cognitive_locality": 0.0,
+     "fault_precision": 0.0,
+     "thrash_rate": 0.0,
+     "evictions": 0,
+     "step_limit": 1,
+     "context_overflow": 0,
+     "invalid_ops": 0,
+     "aborted": 0,
+     "virtualization_ratio": 999991.0,
+     "llm_input_tokens": 82313,
+     "llm_output_tokens": 1713,
+     "llm_calls": 60,
+     "llm_errors": 0
+    }
+   ]
+  }
+ ]
+}

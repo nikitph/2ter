@@ -235,7 +235,7 @@ On the same 256 held-out action prompts used for checkpoint 40, checkpoint
 **252/256 exact actions (98.4%)**. SEARCH improved to 9/10. The raw outputs
 are `results/v1_train_step203_metrics.json` and
 `results/v1_adapter_val_step203.json`. This is action-level evidence only;
-the base-versus-adapter task-level comparison is still in progress.
+the full base-versus-adapter task-level comparison remains pending.
 An operation-stratified check on another 128 held-out prompts scored
 **67/69 SEARCH** and **56/59 ANSWER** exactly, with 123/128 operations correct
 overall (`results/v1_adapter_val_step203_search_answer.json`).
@@ -251,5 +251,21 @@ identified two configuration requirements: the rank-32 adapter needs
 `--max-lora-rank 32` (vLLM defaults to 16), and a bounded response allowance
 is needed with an 8192-token server window. `run_llm.py` now records and
 applies `--max-output-tokens`; the M4 command uses 512. The full local suite
-passed 40 tests. Model-level M4 cells are still pending a served base model
-and the saved adapter on a GPU.
+passed 41 tests. Full model-level M4 cells are still pending.
+
+**Paired serving pilot (n=1).** On 2026-10-07, Qwen2.5-7B-Instruct and the
+step-203 adapter were served together on an RTX 5090 in EU-RO-1. Both ran the
+same held-out `tight` task at 999,991 world objects with a 4-object cap:
+
+| Pilot model | Correct | Steps | Notes written | Thrash | Peak resident |
+|---|---:|---:|---:|---:|---:|
+| Base | 0/1 | 60 (limit) | 0 | 0 | 1 |
+| Step-203 adapter | 1/1 | 30 | 12 | 0 | 4 |
+
+The adapter solved the root-cause task; the base model repeatedly traversed,
+never faulted an object, and reached the step limit. This is a serving and
+runner sanity check, **not an accuracy estimate**. Each model's summary,
+journal, and trace file is committed under `results/` with the
+`llm_v1-base-tight-smoke1` or `llm_v1-sft-step203-tight-smoke1` prefix.
+The evaluation pod `p22y9tr1qpmhlp` was stopped and confirmed `stopped`;
+the checkpoint volume remains available for larger cells.
