@@ -26,7 +26,7 @@ HF_HOME=/workspace/hf-cache python3 -u v1/train_lora.py \
   --train-examples 100000 --val-examples 256 \
   --max-steps -1 --grad-accum 64 --eval-steps 10 --save-steps 2 \
   --eval-generation-examples 32 --resume-from-checkpoint auto \
-  --time-limit-minutes 180
+  --time-limit-minutes 120
 ```
 
 `auto` selects the highest numbered complete Trainer checkpoint. The time
@@ -49,8 +49,10 @@ HF_HOME=/workspace/hf-cache python3 v1/eval_adapter.py \
 ```
 
 The first run used a four-hour time limit and started without
-`--resume-from-checkpoint auto`. The next run uses three hours to leave time
-for validation before the independent billing guard fires. Early action-level
+`--resume-from-checkpoint auto`. The next segment is limited to two training
+hours inside a 210-minute pod guard, leaving up to 90 minutes for setup,
+validation, and shutdown. If setup takes longer than expected, reduce the
+training limit so the process can finish before the guard deadline. Early action-level
 accuracy is a diagnostic only; M3's target is at least 95% correct operation
 selection on held-out validation.
 
@@ -83,9 +85,10 @@ nohup caffeinate -dimsu python3 -u v1/runpod_stop_guard.py \
   > /tmp/cvm-runpod-guard.log 2>&1 < /dev/null &
 ```
 
-Confirm the log contains `GUARD_READY` before starting training. Set training
-`--time-limit-minutes 180`, leaving 30 minutes for checkpoint finalization,
-validation, and transfer before the guard stops the pod. If training ends
+Confirm the log contains `GUARD_READY` before starting training. The example
+uses `--time-limit-minutes 120`, leaving 90 minutes of the 210-minute guard
+for setup, checkpoint finalization, validation, and transfer. Count time from
+`GUARD_READY`, not from the start of Python training. If training ends
 earlier, stop the pod immediately through Runpod and verify it is no longer
 RUNNING. The guard is a fallback if the Codex session is interrupted. The
 volume persists after the pod stops; retain it until checkpoints are copied
