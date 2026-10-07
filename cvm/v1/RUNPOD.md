@@ -48,6 +48,13 @@ HF_HOME=/workspace/hf-cache python3 v1/eval_adapter.py \
   --out /workspace/cvm-v1-full/adapter_val_256.json
 ```
 
+If the pod stopped before training wrote the final `adapter/` directory, pass
+the newest complete `checkpoints/checkpoint-N` as `--adapter-dir` instead.
+Trainer checkpoints have adapter weights but may lack tokenizer files;
+`eval_adapter.py` loads the recorded base-model tokenizer in that case. Use
+`--ops SEARCH,ANSWER` for the sparse operation check and retain a distinct
+output filename for each checkpoint.
+
 The first run used a four-hour time limit and started without
 `--resume-from-checkpoint auto`. The next segment is limited to two training
 hours inside a 210-minute pod guard, leaving up to 90 minutes for setup,

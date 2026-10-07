@@ -221,6 +221,9 @@ the last live training step observed was 48. The status of later checkpoints
 and the second training segment's final metrics cannot be verified until the
 volume is mounted again. No GPU pod was running at the time of this check.
 The machine-readable audit is `results/v1_runpod_segment_2026-10-06.json`.
+The action evaluator now accepts a complete Trainer checkpoint directly if
+the interrupted run did not save a final adapter directory; it loads the
+base-model tokenizer recorded in the checkpoint's PEFT config.
 
 ## M4: Evaluation runner readiness
 

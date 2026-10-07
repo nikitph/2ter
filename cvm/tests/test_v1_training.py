@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from v1.eval_adapter import tokenizer_source
 from v1.train_lora import load_examples, main
 
 
@@ -40,6 +41,19 @@ class TrainingPreflightTests(unittest.TestCase):
             path.write_text(json.dumps(example(4000, "code_cause")) + "\n")
             with self.assertRaises(ValueError):
                 load_examples(path)
+
+    def test_checkpoint_adapter_uses_recorded_base_tokenizer(self):
+        with tempfile.TemporaryDirectory() as root:
+            adapter = Path(root)
+            (adapter / "adapter_config.json").write_text(
+                json.dumps({"base_model_name_or_path": "Qwen/Qwen2.5-7B-Instruct"}))
+            (adapter / "adapter_model.safetensors").write_bytes(b"test weights")
+            self.assertEqual(tokenizer_source(adapter), "Qwen/Qwen2.5-7B-Instruct")
+            (adapter / "tokenizer_config.json").write_text("{}")
+            self.assertEqual(tokenizer_source(adapter), str(adapter))
+            (adapter / "adapter_model.safetensors").unlink()
+            with self.assertRaisesRegex(ValueError, "weights missing"):
+                tokenizer_source(adapter)
 
 
 if __name__ == "__main__":
