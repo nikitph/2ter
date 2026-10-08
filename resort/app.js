@@ -305,7 +305,11 @@ function distToRoads(x, z) {
 const treeRoot = new THREE.Group();
 scene.add(treeRoot);
 const trees = [];
-const DEFAULT_BOUNDARY_PX = [[288, 628], [470, 560], [505, 600], [560, 655], [625, 728], [690, 800], [740, 875], [712, 918], [330, 918], [305, 850], [282, 760], [275, 680]];
+// The plot spans both sides of the entrance lane: the villa block to the north and the camp to the south.
+const DEFAULT_BOUNDARY_PX = [[138, 288], [396, 284], [424, 400], [444, 482], [462, 548], [505, 600], [560, 655], [625, 728], [690, 800], [740, 875], [712, 918], [330, 918], [305, 850], [282, 760], [275, 680], [268, 620], [205, 540], [140, 430]];
+const V1_BOUNDARY_START_PX = [288, 628];
+// villa runs north-south on the top tier, facing east onto the pool
+const VILLA_PX = [173, 348], POOL_PX = [209, 349];
 {
   let s = 4242;
   const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
@@ -357,7 +361,7 @@ function defaultLayout() {
   const it = (type, px, py, rot = 0, name) => { const [x, z] = px2w(px, py); return { id: nid(), type, x, z, rot: rot * DEG, ...(name ? { name } : {}) }; };
   const path = (pxs, width = 2, surface = 'gravel', lamps = true) => ({ id: nid(), pts: pxs.map(([a, b]) => px2w(a, b)), width, surface, lamps });
   return {
-    v: 1, S,
+    v: 2, S,
     footprints: [],
     boundary: DEFAULT_BOUNDARY_PX.map(([a, b]) => px2w(a, b)),
     items: [
@@ -366,8 +370,8 @@ function defaultLayout() {
       it('parking', 352, 628, 18),
       it('courtyard', 452, 652, 0, 'Arrival courtyard'),
       it('bench', 430, 670, 0), it('bench', 474, 670, 0),
-      it('villa', 360, 688, 0, 'Brick pool villa'),
-      it('pool', 362, 726, 0),
+      it('villa', ...VILLA_PX, 90, 'Brick pool villa'),
+      it('pool', ...POOL_PX, 90),
       it('dining', 440, 712, 0, 'Dining pavilion'),
       it('tent', 492, 706, -35, 'Tent cottage 1'),
       it('tent', 518, 742, -40, 'Tent cottage 2'),
@@ -396,6 +400,16 @@ function defaultLayout() {
 }
 let layout = stored?.items ? stored : defaultLayout();
 layout.footprints ||= [];
+if ((layout.v || 1) < 2) {
+  // v1 had the villa and pool south of the lane; move them to where they really are
+  const set = (type, [px, py]) => { const r = layout.items.find((i) => i.type === type); if (r) { [r.x, r.z] = px2w(px, py); r.rot = 90 * DEG; } };
+  set('villa', VILLA_PX);
+  set('pool', POOL_PX);
+  const b0 = px2w(...V1_BOUNDARY_START_PX);
+  if (layout.boundary?.length === 12 && Math.hypot(layout.boundary[0][0] - b0[0], layout.boundary[0][1] - b0[1]) < 0.5) layout.boundary = DEFAULT_BOUNDARY_PX.map(([a, b]) => px2w(a, b));
+  layout.v = 2;
+  try { localStorage.setItem(STORE, JSON.stringify(layout)); } catch { /* storage blocked */ }
+}
 layout.S = S;
 
 /* ------------------------------------------------------------------ */
@@ -606,7 +620,7 @@ const CONTEXT = [
   { px: [405, 230], text: 'Main road · towards Telavadi' },
   { px: [660, 360], text: 'Neighbouring farmland' },
   { px: [140, 640], text: 'Dry hillside' },
-  { px: [250, 300], text: 'Neighbouring coconut plantation' },
+  { px: [300, 450], text: 'Coconut grove' },
   { px: [478, 545], text: 'Junction · resort turn-off' },
 ];
 function rebuildLabels() {
