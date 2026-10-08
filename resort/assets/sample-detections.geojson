@@ -1,0 +1,11 @@
+{
+  "type": "FeatureCollection",
+  "crs": { "type": "name", "properties": { "name": "image-pixels" } },
+  "features": [
+    { "type": "Feature", "properties": { "category": "building", "confidence": 0.93, "source": "sample" }, "geometry": { "type": "Polygon", "coordinates": [[[578, 203], [620, 203], [620, 232], [578, 232], [578, 203]]] } },
+    { "type": "Feature", "properties": { "category": "building", "confidence": 0.88, "source": "sample" }, "geometry": { "type": "Polygon", "coordinates": [[[626, 192], [664, 192], [664, 238], [626, 238], [626, 192]]] } },
+    { "type": "Feature", "properties": { "category": "building", "confidence": 0.81, "source": "sample" }, "geometry": { "type": "Polygon", "coordinates": [[[702, 610], [736, 610], [736, 702], [702, 702], [702, 610]]] } },
+    { "type": "Feature", "properties": { "category": "building", "confidence": 0.77, "source": "sample" }, "geometry": { "type": "Polygon", "coordinates": [[[758, 658], [786, 658], [786, 700], [758, 700], [758, 658]]] } },
+    { "type": "Feature", "properties": { "category": "building", "confidence": 0.84, "source": "sample" }, "geometry": { "type": "Polygon", "coordinates": [[[152, 322], [186, 322], [186, 372], [152, 372], [152, 322]]] } }
+  ]
+}

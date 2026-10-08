@@ -20,9 +20,12 @@ export const M = {
   tentWall: std({ map: T.canvasFabric('#e7d68c') }),
   tentRoof: std({ map: T.canvasFabric('#a29a72'), side: THREE.DoubleSide }),
   scallop: std({ map: T.scallop(), alphaTest: 0.5, side: THREE.DoubleSide }),
-  bark: std({ map: T.bark() }),
-  frond: std({ map: T.frond(), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.8 }),
-  leaves: std({ map: T.leaves(), roughness: 0.9 }),
+  // vegetation is low-poly and flat-shaded; the *I variants are white so instanced trees can carry per-tree colour
+  bark: std({ color: '#a08a73', flatShading: true }),
+  frond: std({ color: '#5f9c55', flatShading: true, side: THREE.DoubleSide }),
+  leaves: std({ color: '#79b56d', flatShading: true }),
+  frondI: std({ color: '#ffffff', flatShading: true, side: THREE.DoubleSide }),
+  leavesI: std({ color: '#ffffff', flatShading: true }),
   thatch: std({ map: T.thatch(), roughness: 1 }),
   net: std({ map: T.net(), alphaTest: 0.4, side: THREE.DoubleSide }),
   wood: std({ map: T.wood() }),
@@ -36,7 +39,7 @@ export const M = {
   darkWood: std({ color: '#3d2a1c' }),
   stone: std({ color: '#8f8a80' }),
   pot: std({ color: '#1c1c1c', roughness: 0.6 }),
-  bush: std({ map: T.leaves(), color: '#9ccf7a' }),
+  bush: std({ color: '#7fbf6a', flatShading: true }),
   sand: std({ color: '#d8c49a', roughness: 1 }),
   white: std({ color: '#f4f4f0' }),
   lampGlass: std({ color: '#fff3cf', emissive: '#ffcc66', emissiveIntensity: 0 }),
@@ -149,42 +152,45 @@ function hipRoof(w, d, h, y, parent, mat = M.roof) {
 let vs = 99;
 const vr = () => ((vs = (vs * 16807) % 2147483647) / 2147483647);
 
-export function palmGeometry(height = 9, lean = 0.8, fronds = 15) {
-  const trunk = new THREE.CylinderGeometry(0.15, 0.24, height, 8, 14, true);
+export function palmGeometry(height = 9, lean = 0.8, fronds = 9) {
+  const trunk = new THREE.CylinderGeometry(0.16, 0.26, height, 6, 6, true);
   trunk.translate(0, height / 2, 0);
-  const p = trunk.attributes.position, uv = trunk.attributes.uv;
+  const p = trunk.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const t = p.getY(i) / height;
-    p.setX(i, p.getX(i) + lean * t * t);
-    // flare at the base like real coconut palms
-    const flare = 1 + Math.max(0, 0.12 - t) * 6;
-    p.setX(i, (p.getX(i) - lean * t * t) * flare + lean * t * t);
+    const flare = 1 + Math.max(0, 0.15 - t) * 5;
+    p.setX(i, p.getX(i) * flare + lean * t * t);
     p.setZ(i, p.getZ(i) * flare);
-    uv.setY(i, (t * height) / 2.5);
   }
-  trunk.computeVertexNormals();
   const nuts = [];
-  for (let k = 0; k < 5; k++) {
-    const s = new THREE.SphereGeometry(0.14, 6, 5);
-    const a = (k / 5) * Math.PI * 2;
-    s.translate(lean + Math.cos(a) * 0.25, height - 0.35, Math.sin(a) * 0.25);
+  for (let k = 0; k < 4; k++) {
+    const s = new THREE.IcosahedronGeometry(0.17, 0);
+    const a = (k / 4) * Math.PI * 2;
+    s.translate(lean + Math.cos(a) * 0.24, height - 0.3, Math.sin(a) * 0.24);
     nuts.push(s);
   }
-  const trunkAll = mergeGeometries([ni(trunk), ...nuts.map((n) => ni(n))]);
+  const trunkAll = mergeGeometries([ni(trunk), ...nuts.map(ni)]);
+  trunkAll.computeVertexNormals();
 
+  // each frond is a folded, drooping blade: a raised spine with two tapered wings
   const parts = [];
   for (let i = 0; i < fronds; i++) {
-    const L = 3.6 + vr() * 1.4, Wd = L * 0.27;
-    const g = new THREE.PlaneGeometry(L, Wd, 10, 1);
-    g.translate(L / 2, 0, 0);
-    g.rotateX(-Math.PI / 2 + (vr() - 0.5) * 0.9); // roll along spine
-    const pa = g.attributes.position;
-    const rise = 0.25 + vr() * 0.55, droop = 0.11 + vr() * 0.07;
-    for (let k = 0; k < pa.count; k++) {
-      const x = pa.getX(k);
-      pa.setY(k, pa.getY(k) + x * rise - x * x * droop);
-    }
-    g.rotateY((i / fronds) * Math.PI * 2 + vr() * 0.3);
+    const L = 3.4 + vr() * 1.4, Wd = 0.62 + vr() * 0.2, rise = 0.35 + vr() * 0.5, droop = 0.13 + vr() * 0.06, N = 5;
+    const pos = [];
+    const at = (j, side) => {
+      const t = j / N, x = t * L;
+      const w = Wd * Math.sin(Math.PI * Math.min(1, t * 1.25 + 0.08));
+      return [x, x * rise - x * x * droop - (side ? 0.12 * w : 0), side * w];
+    };
+    for (let j = 0; j < N; j++)
+      for (const side of [-1, 1]) {
+        const a = at(j, 0), b = at(j + 1, 0), c = at(j, side), d = at(j + 1, side);
+        pos.push(...a, ...b, ...c, ...c, ...b, ...d);
+      }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(new Array((pos.length / 3) * 2).fill(0), 2));
+    g.rotateY((i / fronds) * Math.PI * 2 + vr() * 0.35);
     g.translate(lean, height, 0);
     g.computeVertexNormals();
     parts.push(g);
@@ -192,25 +198,25 @@ export function palmGeometry(height = 9, lean = 0.8, fronds = 15) {
   return { trunk: trunkAll, crown: mergeGeometries(parts) };
 }
 export function broadleafGeometry(height = 6, radius = 3) {
-  const trunk = new THREE.CylinderGeometry(0.18, 0.32, height * 0.55, 7);
+  const trunk = new THREE.CylinderGeometry(0.18, 0.3, height * 0.55, 6);
   trunk.translate(0, height * 0.275, 0);
   const blobs = [];
-  const n = 5 + Math.floor(vr() * 3);
+  const n = 3 + Math.floor(vr() * 2);
   for (let i = 0; i < n; i++) {
-    const b = new THREE.IcosahedronGeometry(radius * (0.45 + vr() * 0.35), 1);
-    const p = b.attributes.position;
-    for (let k = 0; k < p.count; k++) p.setXYZ(k, p.getX(k) * (1 + (vr() - 0.5) * 0.25), p.getY(k) * (0.8 + vr() * 0.2), p.getZ(k) * (1 + (vr() - 0.5) * 0.25));
+    const b = new THREE.IcosahedronGeometry(radius * (0.5 + vr() * 0.3), 0);
     const a = (i / n) * Math.PI * 2;
-    b.translate(Math.cos(a) * radius * 0.45, height * 0.62 + vr() * radius * 0.5, Math.sin(a) * radius * 0.45);
-    b.computeVertexNormals();
+    b.rotateY(vr() * 3);
+    b.translate(Math.cos(a) * radius * 0.4, height * 0.62 + vr() * radius * 0.4, Math.sin(a) * radius * 0.4);
     blobs.push(ni(b));
   }
-  const top = new THREE.IcosahedronGeometry(radius * 0.6, 1);
-  top.translate(0, height * 0.85, 0);
+  const top = new THREE.IcosahedronGeometry(radius * 0.62, 0);
+  top.translate(0, height * 0.86, 0);
   blobs.push(ni(top));
-  return { trunk: ni(trunk), crown: mergeGeometries(blobs) };
+  const crown = mergeGeometries(blobs);
+  crown.computeVertexNormals();
+  return { trunk: ni(trunk), crown };
 }
-export const PALMS = [palmGeometry(9, 0.6), palmGeometry(11, 1.4), palmGeometry(7.5, 0.3, 13)];
+export const PALMS = [palmGeometry(9, 0.6), palmGeometry(11, 1.4), palmGeometry(7.5, 0.3, 8)];
 export const BROADLEAF = [broadleafGeometry(6, 3), broadleafGeometry(8, 4), broadleafGeometry(4.5, 2.2)];
 
 function palmMesh(v = 0, parent, x = 0, z = 0, rot = 0) {

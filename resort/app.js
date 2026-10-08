@@ -94,15 +94,15 @@ let envRT = null;
 
 const sun = new THREE.DirectionalLight('#fff3df', 3);
 sun.castShadow = true;
-sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -140, right: 140, top: 140, bottom: -140, near: 1, far: 900 });
 sun.shadow.bias = -0.0002; sun.shadow.normalBias = 0.06;
 scene.add(sun, sun.target);
-const hemi = new THREE.HemisphereLight('#d6e6ff', '#6e5c3c', 0.6);
+const hemi = new THREE.HemisphereLight('#e4eeff', '#cbb88f', 0.9);
 const moon = new THREE.DirectionalLight('#8fa8ff', 0);
 moon.position.set(-200, 300, -100);
 scene.add(hemi, moon);
-scene.fog = new THREE.Fog('#cad7dd', 350, 3200);
+scene.fog = new THREE.Fog('#e6e3d8', 500, 3000);
 
 const lampLights = Array.from({ length: 10 }, () => {
   const l = new THREE.PointLight('#ffc477', 0, 16, 2);
@@ -120,11 +120,11 @@ function setTime(h, env = true) {
   dayF = smooth(-0.06, 0.2, sunDir.y);
   const warm = 1 - smooth(0.05, 0.45, sunDir.y);
   sun.color.setRGB(1, 0.95 - warm * 0.3, 0.88 - warm * 0.5);
-  sun.intensity = 3.4 * smooth(0, 0.18, sunDir.y);
-  hemi.intensity = 0.08 + 0.6 * dayF;
+  sun.intensity = 3.0 * smooth(0, 0.18, sunDir.y);
+  hemi.intensity = 0.12 + 0.9 * dayF;
   moon.intensity = 0.35 * (1 - dayF);
-  renderer.toneMappingExposure = 0.55 + 0.32 * dayF;
-  const fog = new THREE.Color('#1a2232').lerp(new THREE.Color('#e3b88e'), smooth(-0.05, 0.08, sunDir.y)).lerp(new THREE.Color('#cad7dd'), smooth(0.08, 0.4, sunDir.y));
+  renderer.toneMappingExposure = 0.6 + 0.35 * dayF;
+  const fog = new THREE.Color('#1a2232').lerp(new THREE.Color('#e3b88e'), smooth(-0.05, 0.08, sunDir.y)).lerp(new THREE.Color('#e6e3d8'), smooth(0.08, 0.4, sunDir.y));
   scene.fog.color.copy(fog);
   M.lampGlass.emissiveIntensity = (1 - dayF) * 4;
   M.water.emissiveIntensity = 0.25 + (1 - dayF) * 1.4;
@@ -140,7 +140,8 @@ function updateEnv() {
   envTimer = setTimeout(() => {
     envRT?.dispose();
     envRT = pmrem.fromScene(skyScene);
-    scene.environment = envRT.texture;
+    // reflections only on shiny surfaces; global env lighting washes out the flat-shaded look
+    for (const m of [M.water, M.steel, M.glass]) { m.envMap = envRT.texture; m.needsUpdate = true; }
   }, 60);
 }
 
@@ -152,6 +153,9 @@ const satCanvas = document.createElement('canvas');
 satCanvas.width = IMG_W; satCanvas.height = IMG_H;
 const satCtx = satCanvas.getContext('2d', { willReadFrequently: true });
 satCtx.drawImage(img, 0, 0, IMG_W, IMG_H);
+// The screenshot carries a Google Maps pin and place label. Clone nearby ground over both.
+satCtx.drawImage(satCanvas, 496, 388, 280, 80, 496, 468, 280, 80);
+satCtx.drawImage(satCanvas, 438, 370, 64, 92, 438, 460, 64, 92);
 const pix = satCtx.getImageData(0, 0, IMG_W, IMG_H).data;
 function sample(px, py, r = 1) {
   let R = 0, G = 0, B = 0, n = 0;
@@ -171,23 +175,36 @@ for (let i = 0; i < 200; i++) {
 }
 const edgeColor = new THREE.Color().setRGB(edge[0] / 255, edge[1] / 255, edge[2] / 255, THREE.SRGBColorSpace);
 
-const satTex = new THREE.Texture(img);
-satTex.colorSpace = THREE.SRGBColorSpace; satTex.anisotropy = 8; satTex.needsUpdate = true;
+const satTex = new THREE.CanvasTexture(satCanvas);
+satTex.colorSpace = THREE.SRGBColorSpace; satTex.anisotropy = 8;
 const detailTex = T.grassDetail();
 const STENCIL = { stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc };
+const SAND = new THREE.Color('#ece2c8');
 const groundMat = new THREE.MeshStandardMaterial({ map: satTex, roughness: 1, ...STENCIL });
 groundMat.onBeforeCompile = (sh) => {
   sh.uniforms.detailMap = { value: detailTex };
   sh.uniforms.detailRep = { value: new THREE.Vector2(W / 2.5, H / 2.5) };
-  sh.uniforms.edgeCol = { value: edgeColor };
-  sh.uniforms.satOn = groundMat.userData.satOn = { value: 1 };
+  sh.uniforms.edgeCol = groundMat.userData.edgeCol = { value: SAND.clone() };
+  sh.uniforms.satOn = groundMat.userData.satOn = { value: 0 };
   sh.fragmentShader = sh.fragmentShader
     .replace('#include <common>', '#include <common>\nuniform sampler2D detailMap; uniform vec2 detailRep; uniform vec3 edgeCol; uniform float satOn;')
     .replace('#include <map_fragment>', `#include <map_fragment>
       float d = texture2D(detailMap, vMapUv * detailRep).r;
-      vec3 plain = mix(vec3(0.42, 0.37, 0.25), vec3(0.30, 0.36, 0.20), smoothstep(0.25, 0.5, diffuseColor.g - diffuseColor.r + 0.3));
-      diffuseColor.rgb = mix(plain, diffuseColor.rgb, satOn);
-      diffuseColor.rgb *= mix(1.0, d * 2.0, 0.28);
+      // classify the photo into a soft map palette: dry soil, crops, canopy, paved
+      vec3 sc = pow(max(diffuseColor.rgb, 0.0), vec3(1.0 / 2.2));
+      float lum = dot(sc, vec3(0.3, 0.59, 0.11)), gr = sc.g - sc.r;
+      float sat = max(sc.r, max(sc.g, sc.b)) - min(sc.r, min(sc.g, sc.b));
+      float canopy = (1.0 - smoothstep(0.2, 0.34, lum)) * smoothstep(-0.05, 0.02, gr);
+      float crop = smoothstep(-0.01, 0.05, gr) * (1.0 - canopy);
+      float paved = (1.0 - smoothstep(0.035, 0.09, sat)) * smoothstep(0.3, 0.5, lum) * (1.0 - canopy);
+      vec3 st = vec3(0.93, 0.88, 0.77);
+      st = mix(st, vec3(0.80, 0.87, 0.67), crop);
+      st = mix(st, vec3(0.63, 0.79, 0.56), canopy);
+      st = mix(st, vec3(0.87, 0.86, 0.83), paved);
+      st *= 0.94 + 0.12 * smoothstep(0.15, 0.7, lum);
+      vec3 stylised = pow(st, vec3(2.2));
+      diffuseColor.rgb = mix(stylised, diffuseColor.rgb, satOn);
+      diffuseColor.rgb *= mix(1.0, d * 2.0, mix(0.1, 0.28, satOn));
       float e = smoothstep(0.0, 0.05, min(min(vMapUv.x, 1.0 - vMapUv.x), min(vMapUv.y, 1.0 - vMapUv.y)));
       diffuseColor.rgb = mix(edgeCol, diffuseColor.rgb, e);`);
 };
@@ -201,7 +218,7 @@ gGeo.rotateX(-Math.PI / 2);
 const ground = new THREE.Mesh(gGeo, groundMat);
 ground.receiveShadow = true;
 scene.add(ground);
-const outer = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000), new THREE.MeshStandardMaterial({ color: edgeColor, roughness: 1, ...STENCIL }));
+const outer = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000), new THREE.MeshStandardMaterial({ color: SAND, roughness: 1, ...STENCIL }));
 outer.rotation.x = -Math.PI / 2; outer.position.y = -0.06; outer.receiveShadow = true;
 scene.add(outer);
 
@@ -238,7 +255,7 @@ function ribbon(ptsW, width, mat, { lift = 0.05, tile = 4, offset = 0, closed = 
       pos.push(x, heightAt(x, z) + lift, z);
       uv.push(s < 0 ? 0 : width / tile, (i / n) * (len / tile));
     }
-    if (i < n) { const k = i * 2; idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); }
+    if (i < n) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -292,7 +309,7 @@ const DEFAULT_BOUNDARY_PX = [[288, 628], [470, 560], [505, 600], [560, 655], [62
 {
   let s = 4242;
   const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  const STEP = 3.3;
+  const STEP = 4.6;
   for (let z = -H / 2 + 2; z < H / 2 - 2; z += STEP)
     for (let x = -W / 2 + 2; x < W / 2 - 2; x += STEP) {
       const jx = x + (r() - 0.5) * STEP * 0.9, jz = z + (r() - 0.5) * STEP * 0.9;
@@ -304,7 +321,7 @@ const DEFAULT_BOUNDARY_PX = [[288, 628], [470, 560], [505, 600], [560, 655], [62
       let tree = false;
       if (dry) tree = lum < 105 && r() < 0.18;
       else if (fields) tree = lum < 52 && G >= R * 0.95;
-      else tree = lum < 78 && G >= R * 0.92 && r() < 0.9;
+      else tree = lum < 78 && G >= R * 0.92 && r() < 0.8;
       if (!tree) continue;
       if (distToRoads(jx, jz) < 3) continue;
       const plantation = !dry && !fields;
@@ -317,11 +334,13 @@ const DEFAULT_BOUNDARY_PX = [[288, 628], [470, 560], [505, 600], [560, 655], [62
   for (const [key, list] of Object.entries(groups)) {
     const geo = (key[0] === 'p' ? PALMS : BROADLEAF)[+key[1]];
     const ti = new THREE.InstancedMesh(geo.trunk, M.bark, list.length);
-    const ci = new THREE.InstancedMesh(geo.crown, key[0] === 'p' ? M.frond : M.leaves, list.length);
+    const ci = new THREE.InstancedMesh(geo.crown, key[0] === 'p' ? M.frondI : M.leavesI, list.length);
+    const col = new THREE.Color();
     list.forEach((t, i) => {
       q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, t.rot);
       t.matrix = m4.compose(v3.set(t.x, heightAt(t.x, t.z), t.z), q, sc.setScalar(t.s)).clone();
       ti.setMatrixAt(i, t.matrix); ci.setMatrixAt(i, t.matrix);
+      ci.setColorAt(i, col.setHSL((key[0] === 'p' ? 0.29 : 0.3) + (r() - 0.5) * 0.06, 0.36 + r() * 0.14, (key[0] === 'p' ? 0.43 : 0.5) + (r() - 0.5) * 0.1, THREE.SRGBColorSpace));
       t.ims = [ti, ci]; t.i = i;
     });
     for (const im of [ti, ci]) { im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; treeRoot.add(im); }
@@ -339,6 +358,7 @@ function defaultLayout() {
   const path = (pxs, width = 2, surface = 'gravel', lamps = true) => ({ id: nid(), pts: pxs.map(([a, b]) => px2w(a, b)), width, surface, lamps });
   return {
     v: 1, S,
+    footprints: [],
     boundary: DEFAULT_BOUNDARY_PX.map(([a, b]) => px2w(a, b)),
     items: [
       it('gate', 446, 593, 200, 'Main gate'),
@@ -375,6 +395,7 @@ function defaultLayout() {
   };
 }
 let layout = stored?.items ? stored : defaultLayout();
+layout.footprints ||= [];
 layout.S = S;
 
 /* ------------------------------------------------------------------ */
@@ -394,15 +415,40 @@ function save() {
 }
 function undo() { if (!undoStack.length) return toast('Nothing to undo'); redoStack.push(snapshot()); layout = JSON.parse(undoStack.pop()); afterLoad(); }
 function redo() { if (!redoStack.length) return toast('Nothing to redo'); undoStack.push(snapshot()); layout = JSON.parse(redoStack.pop()); afterLoad(); }
-function afterLoad() { if (!find(selectedId)) select(null); rebuildAll(); save(); }
+function afterLoad() { layout.footprints ||= []; layout.notes ||= []; if (!find(selectedId)) select(null); rebuildAll(); save(); }
 function commit(prev) { pushHistory(prev); rebuildAll(); save(); }
-const find = (id) => id && (layout.items.find((i) => i.id === id) || layout.paths.find((p) => p.id === id) || layout.notes.find((n) => n.id === id));
-const kindOf = (id) => (layout.items.some((i) => i.id === id) ? 'item' : layout.paths.some((p) => p.id === id) ? 'path' : layout.notes.some((n) => n.id === id) ? 'note' : null);
+const find = (id) => id && (layout.items.find((i) => i.id === id) || layout.paths.find((p) => p.id === id) || layout.notes.find((n) => n.id === id) || layout.footprints.find((f) => f.id === id));
+const kindOf = (id) => (layout.items.some((i) => i.id === id) ? 'item' : layout.paths.some((p) => p.id === id) ? 'path' : layout.notes.some((n) => n.id === id) ? 'note' : layout.footprints.some((f) => f.id === id) ? 'footprint' : null);
 
 /* ------------------------------------------------------------------ */
 /* building the scene from the layout                                 */
 /* ------------------------------------------------------------------ */
-const itemsRoot = new THREE.Group(), pathsRoot = new THREE.Group(), notesRoot = new THREE.Group(), boundaryRoot = new THREE.Group();
+const itemsRoot = new THREE.Group(), pathsRoot = new THREE.Group(), notesRoot = new THREE.Group(), boundaryRoot = new THREE.Group(), fpRoot = new THREE.Group();
+scene.add(fpRoot);
+const fpWall = new THREE.MeshStandardMaterial({ color: '#efe7d6', roughness: 0.9, flatShading: true });
+const fpRoof = new THREE.MeshStandardMaterial({ color: '#c8704b', roughness: 0.85, flatShading: true });
+// Detected footprints (e.g. from Microsoft MARS GeoJSON): extruded blocks you can keep, delete or swap for a catalog model.
+function buildFootprint(rec) {
+  if (!rec.pts || rec.pts.length < 3) return;
+  const shape = new THREE.Shape(rec.pts.map(([x, z]) => new THREE.Vector2(x, -z)));
+  let m;
+  if (rec.kind === 'water') {
+    m = new THREE.Mesh(new THREE.ShapeGeometry(shape), M.water);
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = 0.2;
+  } else {
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: rec.height || 3.5, bevelEnabled: false });
+    geo.rotateX(-Math.PI / 2);
+    m = new THREE.Mesh(geo, [fpRoof, fpWall]);
+    m.castShadow = m.receiveShadow = true;
+    const [cx, cz] = centroid(rec.pts);
+    m.position.y = heightAt(cx, cz);
+  }
+  m.userData.id = rec.id;
+  fpRoot.add(m);
+  objs.set(rec.id, m);
+}
+const centroid = (pts) => pts.reduce((a, [x, z]) => [a[0] + x / pts.length, a[1] + z / pts.length], [0, 0]);
 scene.add(itemsRoot, pathsRoot, notesRoot, boundaryRoot);
 const objs = new Map();
 let lampSpots = [];
@@ -496,12 +542,13 @@ function rebuildBoundary() {
 }
 
 function rebuildAll() {
-  clearGroup(itemsRoot); clearGroup(pathsRoot); clearGroup(notesRoot);
+  clearGroup(itemsRoot); clearGroup(pathsRoot); clearGroup(notesRoot); clearGroup(fpRoot);
   objs.clear();
   lampSpots = [];
   layout.items.forEach(buildItem);
   layout.paths.forEach(buildPath);
   layout.notes.forEach(buildNote);
+  layout.footprints.forEach(buildFootprint);
   rebuildBoundary();
   updateClearance();
   rebuildLabels();
@@ -534,7 +581,7 @@ function updateClearance() {
   treesKept = 0; canopyInPlot = 0;
   const pathSamples = [...pathsRoot.children].map((g) => ({ pts: g.userData.samples, w: find(g.userData.id ?? g.children[0]?.userData.id)?.width ?? 2 }));
   for (const t of trees) {
-    let hide = layout.items.some((r) => insideFootprint(r, t.x, t.z, 0.8));
+    let hide = layout.items.some((r) => insideFootprint(r, t.x, t.z, CATALOG[r.type].built ? 2.8 : 1.2)) || layout.footprints.some((f) => pointInPoly(t.x, t.z, f.pts));
     if (!hide)
       for (const p of pathSamples) {
         if (!p.pts) continue;
@@ -582,6 +629,7 @@ function rebuildLabels() {
     add('', r.name || def.name, new THREE.Vector3(r.x, heightAt(r.x, r.z) + (def.built ? 8 : 4), r.z), r.id);
   }
   for (const n of layout.notes) add('note', escapeHtml(n.text), new THREE.Vector3(n.x, heightAt(n.x, n.z) + 4.4, n.z), n.id);
+  for (const f of layout.footprints) if (f.name) { const [x, z] = centroid(f.pts); add('', escapeHtml(f.name), new THREE.Vector3(x, heightAt(x, z) + (f.height || 3.5) + 3, z), f.id); }
   for (const m of measureLabels) labels.push(m);
 }
 const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -592,7 +640,9 @@ function updateLabels() {
     if (!show && l.cls !== 'measure') { l.el.style.display = 'none'; continue; }
     proj.copy(l.pos).project(camera);
     const dist = camera.position.distanceTo(l.pos);
-    const off = proj.z > 1 || Math.abs(proj.x) > 1.1 || Math.abs(proj.y) > 1.1 || (camera === persp && dist > 520 && l.cls !== 'measure');
+    const zoomedOut = camera === ortho ? ortho.zoom < 1.6 : persp.position.distanceTo(orbit.target) > 240;
+    const off = proj.z > 1 || Math.abs(proj.x) > 1.1 || Math.abs(proj.y) > 1.1 ||
+      (l.cls === 'ctx' && !zoomedOut) || (l.cls === '' && camera === persp && dist > 330 && l.id !== selectedId);
     if (off) { l.el.style.display = 'none'; continue; }
     l.el.style.display = '';
     l.el.classList.toggle('sel', !!l.id && l.id === selectedId);
@@ -750,7 +800,7 @@ function groundHit(e) {
 }
 function pickObject(e) {
   setRay(e);
-  const hits = ray.intersectObjects([...itemsRoot.children, ...pathsRoot.children, ...notesRoot.children], true);
+  const hits = ray.intersectObjects([...itemsRoot.children, ...pathsRoot.children, ...notesRoot.children, ...fpRoot.children], true);
   for (const h of hits) if (h.object.userData.id && h.object.visible && h.object.material !== M.poolMask) return h.object.userData.id;
   return hits[0]?.object.userData.id ?? null;
 }
@@ -890,6 +940,33 @@ function renderInspector() {
     $('pS').onchange = (e) => { const prev = snapshot(); rec.surface = e.target.value; commit(prev); };
     $('pL').onchange = (e) => { const prev = snapshot(); rec.lamps = e.target.checked; commit(prev); };
     $('iDel').onclick = deleteSelected;
+  } else if (tool === 'select' && rec && k === 'footprint') {
+    const area = polyArea(rec.pts);
+    const built = Object.entries(CATALOG).filter(([, d]) => d.built || d.hard);
+    el.innerHTML = `
+      <div class="title"><span class="ic">${rec.kind === 'water' ? '💧' : '🧱'}</span><div><div class="eyebrow">Detected ${rec.kind}${rec.source ? ` · ${escapeHtml(rec.source)}` : ''}</div><input type="text" id="iName" value="${escapeHtml(rec.name || '')}" placeholder="Name it (e.g. staff quarters)"/></div></div>
+      <div class="row"><span class="k">Footprint</span><span class="v">${fmt(area)} m²</span></div>
+      ${rec.conf != null ? `<div class="row"><span class="k">Model confidence</span><span class="v">${Math.round(rec.conf * (rec.conf <= 1 ? 100 : 1))}%</span></div>` : ''}
+      ${rec.kind !== 'water' ? `<div class="row"><span class="k">Height</span><span class="v"><input type="number" id="fH" value="${rec.height || 3.5}" step="0.5" style="width:64px;text-align:right;font:inherit;border:1px solid var(--border);border-radius:6px;padding:2px 4px"/> m</span></div>` : ''}
+      <div class="row"><span class="k">Replace with</span><span class="v"><select id="fSwap"><option value="">choose…</option>${built.map(([k2, d]) => `<option value="${k2}">${d.icon} ${d.name}</option>`).join('')}</select></span></div>
+      <div class="help" style="margin-top:6px">Swapping drops the catalog model on this footprint, aligned to its longest wall.</div>
+      <div class="btns"><button class="btn" id="iFocus">Focus</button><button class="btn danger" id="iDel">Delete</button></div>`;
+    $('iName').onchange = (e) => { const prev = snapshot(); rec.name = e.target.value.trim(); commit(prev); };
+    if ($('fH')) $('fH').onchange = (e) => { const prev = snapshot(); rec.height = Math.max(0.5, +e.target.value || 3.5); commit(prev); };
+    $('fSwap').onchange = (e) => {
+      if (!e.target.value) return;
+      const prev = snapshot();
+      const [cx, cz] = centroid(rec.pts);
+      let best = 0, rot = 0;
+      rec.pts.forEach(([x, z], i) => { const [nx, nz] = rec.pts[(i + 1) % rec.pts.length], l = Math.hypot(nx - x, nz - z); if (l > best) { best = l; rot = -Math.atan2(nz - z, nx - x); } });
+      const item = { id: nid(), type: e.target.value, x: cx, z: cz, rot, ...(rec.name ? { name: rec.name } : {}) };
+      layout.items.push(item);
+      layout.footprints.splice(layout.footprints.indexOf(rec), 1);
+      commit(prev);
+      select(item.id);
+    };
+    $('iFocus').onclick = () => { const [x, z] = centroid(rec.pts); focusOn(x, z, Math.sqrt(area) * 3 + 20); };
+    $('iDel').onclick = deleteSelected;
   } else if (tool === 'select' && rec && k === 'note') {
     el.innerHTML = `
       <div class="title"><span class="ic">📌</span><div class="eyebrow">Note</div></div>
@@ -957,6 +1034,7 @@ function updateKPIs() {
     keys += d.keys || 0; guests += d.guests || 0; cost += d.cost || 0;
     if (d.built) built += d.w * d.d; else if (d.hard) hard += d.w * d.d;
   }
+  for (const f of layout.footprints) if (f.kind !== 'water') built += polyArea(f.pts);
   let pathLen = 0, pathArea = 0;
   for (const p of layout.paths) { const l = polyLen(p.pts); pathLen += l; pathArea += l * p.width; cost += (l * p.width * (p.surface === 'pavers' ? 1800 : p.surface === 'laterite' ? 1400 : 600)) / 1e5; }
   hard += pathArea;
@@ -979,7 +1057,7 @@ function deleteSelected() {
   const k = kindOf(selectedId);
   if (!k) return;
   const prev = snapshot();
-  const arr = k === 'item' ? layout.items : k === 'path' ? layout.paths : layout.notes;
+  const arr = { item: layout.items, path: layout.paths, note: layout.notes, footprint: layout.footprints }[k];
   arr.splice(arr.findIndex((r) => r.id === selectedId), 1);
   selectedId = null;
   commit(prev);
@@ -1067,10 +1145,14 @@ document.querySelectorAll('.tool').forEach((b) => (b.onclick = () => setTool(b.d
 document.querySelectorAll('.seg').forEach((b) => (b.onclick = () => setView(b.dataset.view)));
 $('timeIn').oninput = (e) => setTime(+e.target.value);
 
-const layerOn = { satellite: true, trees: true, boundary: true, labels: true, paths: true };
+const layerOn = { satellite: false, trees: true, boundary: true, labels: true, paths: true };
 document.querySelectorAll('[data-layer]').forEach((c) => (c.onchange = () => {
   layerOn[c.dataset.layer] = c.checked;
-  if (groundMat.userData.satOn) groundMat.userData.satOn.value = layerOn.satellite ? 1 : 0;
+  if (groundMat.userData.satOn) {
+    groundMat.userData.satOn.value = layerOn.satellite ? 1 : 0;
+    groundMat.userData.edgeCol.value.copy(layerOn.satellite ? edgeColor : SAND);
+  }
+  outer.material.color.copy(layerOn.satellite ? edgeColor : SAND);
   treeRoot.visible = layerOn.trees;
   boundaryRoot.visible = layerOn.boundary;
   pathsRoot.visible = layerOn.paths;
@@ -1091,7 +1173,9 @@ $('fileIn').onchange = async (e) => {
   if (!f) return;
   try {
     const data = JSON.parse(await f.text());
+    if (data.type === 'FeatureCollection' || data.type === 'Feature') { importGeoJSON(data, f.name); e.target.value = ''; return; }
     if (!Array.isArray(data.items) || !Array.isArray(data.paths)) throw new Error('not a layout');
+    data.footprints ||= [];
     data.notes ||= [];
     pushHistory();
     layout = data;
@@ -1101,6 +1185,47 @@ $('fileIn').onchange = async (e) => {
   } catch { toast('That file is not a Vrukshali layout'); }
   e.target.value = '';
 };
+// GeoJSON from Microsoft MARS (or any GIS tool): buildings, roads, railways and water bodies.
+// Coordinates may be lon/lat (needs the image centre, since the screenshot is north-up at a known
+// scale) or image pixels (a CRS named "image-pixels", or values outside lon/lat range).
+function importGeoJSON(data, fname) {
+  const feats = data.type === 'Feature' ? [data] : data.features || [];
+  const firstCoord = (g) => { let c = g?.coordinates; while (Array.isArray(c?.[0])) c = c[0]; return c; };
+  const c0 = firstCoord(feats.find((f) => f.geometry)?.geometry);
+  if (!c0) return toast('No geometries found in that GeoJSON');
+  const crsName = String(data.crs?.properties?.name || '').toLowerCase();
+  const pixels = crsName.includes('pixel') || Math.abs(c0[0]) > 180 || Math.abs(c0[1]) > 90;
+  if (!pixels && !layout.geo) {
+    const ans = prompt('These detections are in latitude/longitude. Enter the latitude, longitude of the centre of the satellite image (right-click that spot in Google Maps to copy it):', '');
+    const m = ans && ans.match(/(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)/);
+    if (!m) return toast('Import cancelled: the image centre is needed to place lat/lon data');
+    layout.geo = { lat: +m[1], lon: +m[2] };
+  }
+  const toW = pixels ? ([x, y]) => px2w(x, y) : ([lon, lat]) => [(lon - layout.geo.lon) * 111320 * Math.cos(layout.geo.lat * DEG), -(lat - layout.geo.lat) * 110574];
+  const ring = (r) => { const pts = r.map(toW); const a = pts[0], b = pts[pts.length - 1]; if (a && b && a[0] === b[0] && a[1] === b[1]) pts.pop(); return pts; };
+  const prev = snapshot();
+  let nb = 0, nw = 0, nr = 0;
+  for (const f of feats) {
+    const g = f.geometry, pr = f.properties || {};
+    if (!g) continue;
+    const cat = String(pr.category ?? pr.class ?? pr.label ?? pr.type ?? pr.name ?? '').toLowerCase();
+    const conf = pr.confidence ?? pr.score ?? pr.probability;
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+    for (const p of polys) {
+      const water = /water|pond|lake|pool|tank|river/.test(cat);
+      layout.footprints.push({ id: nid(), kind: water ? 'water' : 'building', pts: ring(p[0]), height: +pr.height || (water ? 0 : 3.5), conf, source: pr.source || 'MARS' });
+      water ? nw++ : nb++;
+    }
+    const lines = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
+    for (const l of lines) {
+      const rail = /rail/.test(cat);
+      layout.paths.push({ id: nid(), pts: l.map(toW), width: +pr.width || (rail ? 3 : 4), surface: rail ? 'gravel' : 'laterite', lamps: false });
+      nr++;
+    }
+  }
+  commit(prev);
+  toast(`Imported ${nb} buildings, ${nr} roads, ${nw} water bodies from ${fname}`);
+}
 $('bReset').onclick = () => {
   if (!confirm('Restore the default layout? Your current layout stays in undo history.')) return;
   pushHistory();

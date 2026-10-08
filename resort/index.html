@@ -24,7 +24,7 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #cfd9df; color: var(--ink); font: 13px/1.4 var(--sans); }
   #view { position: fixed; inset: 0; display: block; outline: none; }
-  .panel { position: absolute; background: var(--panel); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+  .panel { position: absolute; z-index: 2; background: var(--panel); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
   button { font: inherit; color: inherit; cursor: pointer; }
   .mono { font-family: var(--mono); }
   .muted { color: var(--ink-2); }
@@ -154,9 +154,9 @@
   <button id="bRedo" title="Redo (Ctrl+Shift+Z)">↷</button>
   <button id="bShot" title="Save a screenshot">Snapshot</button>
   <button id="bExport" title="Download the layout as JSON">Export</button>
-  <button id="bImport" title="Load a layout JSON">Import</button>
+  <button id="bImport" title="Load a layout JSON, or GeoJSON detections from Microsoft MARS / any GIS tool">Import</button>
   <button id="bReset" title="Restore the default layout">Reset</button>
-  <input type="file" id="fileIn" accept=".json,application/json" hidden />
+  <input type="file" id="fileIn" accept=".json,.geojson,application/json,application/geo+json" hidden />
 </div>
 
 <div id="tools" class="panel">
@@ -184,7 +184,7 @@
 
 <div id="layers" class="panel">
   <div class="eyebrow">Layers</div>
-  <label><input type="checkbox" data-layer="satellite" checked> Satellite imagery</label>
+  <label><input type="checkbox" data-layer="satellite"> Satellite photo</label>
   <label><input type="checkbox" data-layer="trees" checked> Existing trees</label>
   <label><input type="checkbox" data-layer="boundary" checked> Plot boundary</label>
   <label><input type="checkbox" data-layer="labels" checked> Labels &amp; notes</label>
@@ -205,7 +205,7 @@
 
 <div id="walkHint" class="panel"><b>Click to walk</b><div class="help"><kbd>W A S D</kbd> move · <kbd>Shift</kbd> run · mouse look · <kbd>Esc</kbd> release</div></div>
 <div id="toast"></div>
-<div id="loading">Planting 2,000 coconut palms…</div>
+<div id="loading">Planting coconut palms…</div>
 
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js" } }
