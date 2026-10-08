@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vrukshali Digital Twin</title>
+<style>
+  :root {
+    --panel: rgba(252, 249, 242, 0.93);
+    --border: rgba(60, 45, 25, 0.12);
+    --ink: #2a2418;
+    --ink-2: #6b604c;
+    --ink-3: #9a8f7a;
+    --green: #2f6b43;
+    --green-soft: #e3efe4;
+    --terra: #b5532f;
+    --terra-soft: #f7e5dc;
+    --gold: #c9962f;
+    --shadow: 0 8px 28px rgba(40, 30, 10, 0.14), 0 1px 2px rgba(40, 30, 10, 0.08);
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cfd9df; color: var(--ink); font: 13px/1.4 var(--sans); }
+  #view { position: fixed; inset: 0; display: block; outline: none; }
+  .panel { position: absolute; background: var(--panel); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .mono { font-family: var(--mono); }
+  .muted { color: var(--ink-2); }
+  .faint { color: var(--ink-3); }
+
+  #brand { top: 14px; left: 14px; padding: 10px 14px; display: flex; gap: 10px; align-items: center; }
+  .leaf { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(140deg, #3f8a52, #1f4d2e); display: grid; place-items: center; color: #f3ead2; font: italic 700 19px var(--serif); }
+  #brand h1 { margin: 0; font: 600 17px var(--serif); letter-spacing: .01em; }
+  #brand .sub { font-size: 11px; color: var(--ink-2); }
+
+  #views { top: 14px; left: 50%; transform: translateX(-50%); padding: 4px; display: flex; gap: 2px; }
+  .seg { border: 0; background: transparent; padding: 7px 14px; border-radius: 10px; font-weight: 600; color: var(--ink-2); display: flex; gap: 6px; align-items: center; }
+  .seg.on { background: var(--ink); color: #fbf6ea; }
+  .seg kbd { font: 10px var(--mono); opacity: .55; }
+
+  #file { top: 14px; right: 14px; padding: 4px; display: flex; gap: 2px; align-items: center; }
+  #file button { border: 0; background: transparent; padding: 7px 10px; border-radius: 9px; font-weight: 600; color: var(--ink-2); }
+  #file button:hover { background: rgba(0,0,0,.05); color: var(--ink); }
+  #saved { font-size: 11px; color: var(--green); padding: 0 8px; font-weight: 600; }
+
+  #tools { top: 84px; left: 14px; padding: 6px; display: flex; flex-direction: column; gap: 3px; }
+  .tool { width: 42px; height: 42px; border: 0; border-radius: 10px; background: transparent; display: grid; place-items: center; position: relative; color: var(--ink-2); }
+  .tool:hover { background: rgba(0,0,0,.05); }
+  .tool.on { background: var(--green); color: white; }
+  .tool svg { width: 20px; height: 20px; }
+  .tool .tip { position: absolute; left: 50px; white-space: nowrap; background: var(--ink); color: #fbf6ea; font-size: 11px; padding: 4px 8px; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity .15s; }
+  .tool:hover .tip { opacity: 1; }
+  .sep { height: 1px; background: var(--border); margin: 3px 4px; }
+
+  #catalog { top: 84px; left: 74px; width: 300px; padding: 12px; display: none; max-height: calc(100vh - 200px); overflow-y: auto; }
+  #catalog.show { display: block; }
+  #catalog h3, .card h3 { margin: 0 0 8px; font: 600 14px var(--serif); }
+  .cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .cat { border: 1px solid var(--border); background: white; border-radius: 10px; padding: 8px 4px 6px; text-align: center; font-size: 11px; line-height: 1.2; }
+  .cat:hover { border-color: var(--green); }
+  .cat.on { border-color: var(--green); background: var(--green-soft); }
+  .cat .ic { font-size: 22px; display: block; margin-bottom: 3px; }
+  .cat .dim { display: block; color: var(--ink-3); font: 9.5px var(--mono); margin-top: 2px; }
+
+  #side { position: absolute; top: 70px; right: 14px; width: 300px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 170px); }
+  #side .panel { position: relative; }
+  .card { padding: 12px 14px; }
+  .card .row { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0; gap: 10px; }
+  .card .row .k { color: var(--ink-2); }
+  .card .row .v { font: 600 12.5px var(--mono); text-align: right; }
+  .eyebrow { font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; margin-bottom: 4px; }
+  #inspector { overflow-y: auto; }
+  #inspector .title { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  #inspector .title .ic { font-size: 22px; }
+  #inspector input[type=text], #inspector textarea, #inspector select { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; font: inherit; background: white; }
+  #inspector textarea { min-height: 70px; resize: vertical; }
+  .btns { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .btn { border: 1px solid var(--border); background: white; border-radius: 9px; padding: 6px 10px; font-weight: 600; font-size: 12px; }
+  .btn:hover { border-color: var(--ink-3); }
+  .btn.primary { background: var(--green); color: white; border-color: var(--green); }
+  .btn.danger { color: #a3321b; }
+  .btn.on { background: var(--ink); color: white; }
+  .help { font-size: 12px; color: var(--ink-2); }
+  .help kbd { font: 10px var(--mono); background: rgba(0,0,0,.06); border-radius: 4px; padding: 1px 5px; color: var(--ink); }
+  .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .kpi { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 7px 9px; }
+  .kpi .k { font-size: 10px; color: var(--ink-3); font-weight: 600; }
+  .kpi .v { font: 700 15px var(--mono); margin-top: 1px; }
+  .kpi .v small { font-size: 10px; color: var(--ink-3); font-weight: 500; }
+  .meter { height: 5px; border-radius: 3px; background: #ece4d2; margin-top: 4px; overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--green); }
+
+  #layers { left: 14px; bottom: 14px; padding: 10px 12px; }
+  #layers label { display: flex; gap: 7px; align-items: center; padding: 2px 0; font-size: 12px; cursor: pointer; }
+  #layers input { accent-color: var(--green); }
+
+  #time { left: 50%; bottom: 14px; transform: translateX(-50%); padding: 10px 16px; display: flex; gap: 12px; align-items: center; min-width: 420px; }
+  #time input { flex: 1; accent-color: var(--gold); }
+  #timeLbl { font: 600 12px var(--mono); min-width: 130px; text-align: right; }
+  #time .sun { font-size: 18px; }
+
+  #photos { right: 14px; bottom: 14px; padding: 10px; width: 300px; }
+  .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .thumb { border: 2px solid transparent; border-radius: 8px; overflow: hidden; padding: 0; aspect-ratio: 4/3; background: #ddd; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb.on { border-color: var(--green); }
+  #compareRow { display: none; margin-top: 8px; gap: 8px; align-items: center; font-size: 11px; color: var(--ink-2); }
+  #compareRow.show { display: flex; }
+  #compareRow input { flex: 1; accent-color: var(--green); }
+  #overlay { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 1; }
+
+  #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .lbl { position: absolute; left: 0; top: 0; white-space: nowrap; font-size: 11px; font-weight: 600; background: rgba(252,249,242,.9); border: 1px solid var(--border); padding: 2px 8px; border-radius: 999px; color: var(--ink); box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+  .lbl.ctx { background: rgba(42,36,24,.65); color: #f7efdc; border-color: transparent; font-weight: 500; }
+  .lbl.note { background: #fff4c2; border-color: #e6cf6e; max-width: 220px; white-space: normal; font-weight: 500; pointer-events: auto; cursor: pointer; }
+  .lbl.note::before { content: "📌 "; }
+  .lbl.measure { background: var(--ink); color: white; font-family: var(--mono); }
+  .lbl.sel { background: var(--green); color: white; }
+
+  #toast { position: fixed; top: 70px; left: 50%; transform: translate(-50%, -20px); opacity: 0; transition: all .25s; padding: 9px 14px; background: var(--ink); color: #fbf6ea; border-radius: 10px; font-weight: 600; pointer-events: none; z-index: 5; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #crosshair { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: white; box-shadow: 0 0 0 1.5px rgba(0,0,0,.4); display: none; }
+  #walkHint { position: fixed; left: 50%; top: 58%; transform: translateX(-50%); padding: 12px 16px; display: none; text-align: center; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #efe8d8; z-index: 10; font: 600 16px var(--serif); color: var(--ink-2); transition: opacity .6s; }
+
+  @media (max-width: 1000px) {
+    #side { width: 240px; }
+    #photos, #time { display: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="view" tabindex="0"></canvas>
+<img id="overlay" alt="" />
+<div id="labels"></div>
+<div id="crosshair"></div>
+
+<div id="brand" class="panel">
+  <div class="leaf">V</div>
+  <div><h1>Vrukshali · Digital Twin</h1><div class="sub" id="brandSub">Telavadi · satellite-aligned · 0.30 m/px</div></div>
+</div>
+
+<div id="views" class="panel">
+  <button class="seg on" data-view="orbit">Orbit <kbd>1</kbd></button>
+  <button class="seg" data-view="plan">Plan <kbd>2</kbd></button>
+  <button class="seg" data-view="walk">Walk <kbd>3</kbd></button>
+</div>
+
+<div id="file" class="panel">
+  <span id="saved">Saved</span>
+  <button id="bUndo" title="Undo (Ctrl+Z)">↶</button>
+  <button id="bRedo" title="Redo (Ctrl+Shift+Z)">↷</button>
+  <button id="bShot" title="Save a screenshot">Snapshot</button>
+  <button id="bExport" title="Download the layout as JSON">Export</button>
+  <button id="bImport" title="Load a layout JSON">Import</button>
+  <button id="bReset" title="Restore the default layout">Reset</button>
+  <input type="file" id="fileIn" accept=".json,application/json" hidden />
+</div>
+
+<div id="tools" class="panel">
+  <button class="tool on" data-tool="select"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 3l14 8-6 2-2 6z"/></svg><span class="tip">Select &amp; move · V</span></button>
+  <button class="tool" data-tool="add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg><span class="tip">Add from catalog · A</span></button>
+  <button class="tool" data-tool="path"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20c4-2 3-7 8-8s5-6 8-8"/><circle cx="4" cy="20" r="1.5"/><circle cx="20" cy="4" r="1.5"/></svg><span class="tip">Draw path · P</span></button>
+  <button class="tool" data-tool="measure"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg><span class="tip">Measure distance &amp; area · M</span></button>
+  <button class="tool" data-tool="boundary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><path d="M4 6l9-3 7 7-3 10-12-2z"/></svg><span class="tip">Edit plot boundary · B</span></button>
+  <button class="tool" data-tool="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span class="tip">Drop a note · N</span></button>
+</div>
+
+<div id="catalog" class="panel">
+  <h3>Add to the resort</h3>
+  <div class="help" style="margin-bottom:8px">Pick an item, then click on the ground. <kbd>Q</kbd>/<kbd>E</kbd> rotate, <kbd>Shift</kbd>-click to keep placing.</div>
+  <div class="cat-grid" id="catGrid"></div>
+</div>
+
+<div id="side">
+  <div id="inspector" class="panel card"></div>
+  <div class="panel card">
+    <div class="eyebrow">Plan metrics</div>
+    <div class="kpis" id="kpis"></div>
+  </div>
+</div>
+
+<div id="layers" class="panel">
+  <div class="eyebrow">Layers</div>
+  <label><input type="checkbox" data-layer="satellite" checked> Satellite imagery</label>
+  <label><input type="checkbox" data-layer="trees" checked> Existing trees</label>
+  <label><input type="checkbox" data-layer="boundary" checked> Plot boundary</label>
+  <label><input type="checkbox" data-layer="labels" checked> Labels &amp; notes</label>
+  <label><input type="checkbox" data-layer="paths" checked> Paths &amp; lamps</label>
+</div>
+
+<div id="time" class="panel">
+  <span class="sun" id="sunIc">☀️</span>
+  <input type="range" id="timeIn" min="5.5" max="21" step="0.05" value="10.5" />
+  <span id="timeLbl">10:30 · Morning</span>
+</div>
+
+<div id="photos" class="panel">
+  <div class="eyebrow">Reference photos · click to stand where they were taken</div>
+  <div class="thumbs" id="thumbs"></div>
+  <div id="compareRow"><span>Model</span><input type="range" id="compareIn" min="0" max="100" value="0" /><span>Photo</span></div>
+</div>
+
+<div id="walkHint" class="panel"><b>Click to walk</b><div class="help"><kbd>W A S D</kbd> move · <kbd>Shift</kbd> run · mouse look · <kbd>Esc</kbd> release</div></div>
+<div id="toast"></div>
+<div id="loading">Planting 2,000 coconut palms…</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
