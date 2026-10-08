@@ -306,10 +306,12 @@ const treeRoot = new THREE.Group();
 scene.add(treeRoot);
 const trees = [];
 // The plot spans both sides of the entrance lane: the villa block to the north and the camp to the south.
-const DEFAULT_BOUNDARY_PX = [[138, 288], [396, 284], [424, 400], [444, 482], [462, 548], [505, 600], [560, 655], [625, 728], [690, 800], [740, 875], [712, 918], [330, 918], [305, 850], [282, 760], [275, 680], [268, 620], [205, 540], [140, 430]];
-const V1_BOUNDARY_START_PX = [288, 628];
+const DEFAULT_BOUNDARY_PX = [[114, 132], [352, 122], [396, 284], [424, 400], [444, 482], [462, 548], [505, 600], [560, 655], [625, 728], [690, 800], [740, 875], [712, 918], [330, 918], [305, 850], [282, 760], [275, 680], [268, 620], [205, 540], [140, 430], [120, 300]];
+const V1_BOUNDARY_START_PX = [288, 628], V2_BOUNDARY_START_PX = [138, 288];
 // villa runs north-south on the top tier, facing east onto the pool
 const VILLA_PX = [173, 348], POOL_PX = [209, 349];
+// dining hall is the long block further north, at the end of the strip running up from the villa
+const DINING_PX = [143, 178];
 {
   let s = 4242;
   const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
@@ -361,7 +363,7 @@ function defaultLayout() {
   const it = (type, px, py, rot = 0, name) => { const [x, z] = px2w(px, py); return { id: nid(), type, x, z, rot: rot * DEG, ...(name ? { name } : {}) }; };
   const path = (pxs, width = 2, surface = 'gravel', lamps = true) => ({ id: nid(), pts: pxs.map(([a, b]) => px2w(a, b)), width, surface, lamps });
   return {
-    v: 2, S,
+    v: 3, S,
     footprints: [],
     boundary: DEFAULT_BOUNDARY_PX.map(([a, b]) => px2w(a, b)),
     items: [
@@ -372,7 +374,7 @@ function defaultLayout() {
       it('bench', 430, 670, 0), it('bench', 474, 670, 0),
       it('villa', ...VILLA_PX, 90, 'Brick pool villa'),
       it('pool', ...POOL_PX, 90),
-      it('dining', 440, 712, 0, 'Dining pavilion'),
+      it('dining', ...DINING_PX, 90, 'Dining pavilion'),
       it('tent', 492, 706, -35, 'Tent cottage 1'),
       it('tent', 518, 742, -40, 'Tent cottage 2'),
       it('tent', 545, 778, -45, 'Tent cottage 3'),
@@ -408,6 +410,13 @@ if ((layout.v || 1) < 2) {
   const b0 = px2w(...V1_BOUNDARY_START_PX);
   if (layout.boundary?.length === 12 && Math.hypot(layout.boundary[0][0] - b0[0], layout.boundary[0][1] - b0[1]) < 0.5) layout.boundary = DEFAULT_BOUNDARY_PX.map(([a, b]) => px2w(a, b));
   layout.v = 2;
+}
+if (layout.v < 3) {
+  const d = layout.items.find((i) => i.type === 'dining');
+  if (d) { [d.x, d.z] = px2w(...DINING_PX); d.rot = 90 * DEG; }
+  const b0 = px2w(...V2_BOUNDARY_START_PX);
+  if (layout.boundary && Math.hypot(layout.boundary[0][0] - b0[0], layout.boundary[0][1] - b0[1]) < 0.5) layout.boundary = DEFAULT_BOUNDARY_PX.map(([a, b]) => px2w(a, b));
+  layout.v = 3;
   try { localStorage.setItem(STORE, JSON.stringify(layout)); } catch { /* storage blocked */ }
 }
 layout.S = S;
