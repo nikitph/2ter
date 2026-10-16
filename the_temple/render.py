@@ -96,7 +96,7 @@ def camcorder(img, fi, gain, blur, stamp, glitch=0.0):
     my = _yy + (glitch * 30 * rng.random() if glitch > 0.5 else 0)
     out = cv2.remap(out, mx, my.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
     if glitch > 0:
-        out += (rng.random((H, 1)) > 1 - 0.25 * glitch) * rng.random((H, W)).astype(np.float32)[..., None] * 0.6
+        out += ((rng.random((H, 1)) > 1 - 0.25 * glitch) * rng.random((H, W)).astype(np.float32))[..., None] * 0.6
     if rng.random() < 0.08:  # tape dropout
         y0, x0 = rng.integers(0, H), rng.integers(0, W - 80)
         out[y0, x0:x0 + rng.integers(20, 80)] = 0.9
