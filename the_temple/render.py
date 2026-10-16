@@ -6,6 +6,9 @@
 """
 import argparse
 import os
+
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_v, "1")
 import subprocess
 import sys
 from multiprocessing import Pool
@@ -13,6 +16,8 @@ from multiprocessing import Pool
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+
+cv2.setNumThreads(1)
 
 from common import (CUT_TO_BLACK, FONTS, FPS, H, HERE, NFRAMES, OH, OW, SCENES, SUBTITLES, W, kf)
 
@@ -175,7 +180,7 @@ def main():
 
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
            "-s", f"{OW}x{OH}", "-r", str(FPS), "-i", "-", "-i", wav,
-           "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p",
+           "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
            "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", args.out]
     ff = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     with Pool(args.workers) as pool:
